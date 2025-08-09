@@ -1,3 +1,9 @@
+
+'use client'
+
+import { useActionState } from 'react'
+import { useFormStatus } from "react-dom"
+import { handleRegister } from "@/app/register/actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -9,6 +15,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Terminal, CheckCircle, Loader2 } from "lucide-react"
 
 function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -56,7 +64,20 @@ function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+const SubmitButton = () => {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear Cuenta"}
+        </Button>
+    )
+}
+
 export default function RegisterPage() {
+    const [state, formAction] = useActionState(handleRegister, {
+        message: "",
+    });
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-4">
@@ -73,28 +94,49 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="full-name">Nombre Completo</Label>
-                <Input id="full-name" placeholder="Tu Nombre" required />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nombre@ejemplo.com"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input id="password" type="password" required />
-              </div>
-              <Button type="submit" className="w-full" asChild>
-                <Link href="/dashboard">Crear Cuenta</Link>
-              </Button>
-            </div>
+            {state.message === 'success' ? (
+                <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>¡Registro Exitoso!</AlertTitle>
+                    <AlertDescription>
+                        Tu cuenta ha sido creada. Ahora puedes <Link href="/login" className="font-bold underline">iniciar sesión</Link>.
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                <form action={formAction} className="grid gap-4">
+                    {state.message && state.message !== 'success' && (
+                        <Alert variant="destructive">
+                            <Terminal className="h-4 w-4" />
+                            <AlertTitle>Error de Registro</AlertTitle>
+                            <AlertDescription>
+                                {state.message}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    <div className="grid gap-2">
+                        <Label htmlFor="fullName">Nombre Completo</Label>
+                        <Input id="fullName" name="fullName" placeholder="Tu Nombre" required />
+                        {state.errors?.fullName && <p className="text-sm font-medium text-destructive">{state.errors.fullName[0]}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="email">Correo Electrónico</Label>
+                        <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="nombre@ejemplo.com"
+                        required
+                        />
+                         {state.errors?.email && <p className="text-sm font-medium text-destructive">{state.errors.email[0]}</p>}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="password">Contraseña</Label>
+                        <Input id="password" name="password" type="password" required />
+                        {state.errors?.password && <p className="text-sm font-medium text-destructive">{state.errors.password[0]}</p>}
+                    </div>
+                    <SubmitButton />
+                </form>
+            )}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />

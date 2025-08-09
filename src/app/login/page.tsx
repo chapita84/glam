@@ -1,3 +1,9 @@
+
+'use client'
+
+import { useActionState } from "react"
+import { useFormStatus } from "react-dom"
+import { handleLogin } from "@/app/login/actions"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -9,6 +15,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Terminal, Loader2 } from "lucide-react"
+import { redirect } from 'next/navigation'
+import { useEffect } from 'react'
 
 function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -56,8 +66,26 @@ function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+const SubmitButton = () => {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Iniciar Sesión"}
+        </Button>
+    )
+}
 
 export default function LoginPage() {
+  const [state, formAction] = useActionState(handleLogin, {
+    message: "",
+  });
+
+  useEffect(() => {
+    if (state.message === 'success') {
+      redirect('/dashboard');
+    }
+  }, [state.message]);
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-4">
@@ -74,15 +102,26 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4">
+            <form action={formAction} className="grid gap-4">
+              {state.message && state.message !== 'success' && (
+                  <Alert variant="destructive">
+                      <Terminal className="h-4 w-4" />
+                      <AlertTitle>Error de inicio de sesión</AlertTitle>
+                      <AlertDescription>
+                          {state.message}
+                      </AlertDescription>
+                  </Alert>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="nombre@ejemplo.com"
                   required
                 />
+                 {state.errors?.email && <p className="text-sm font-medium text-destructive">{state.errors.email[0]}</p>}
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
@@ -94,12 +133,11 @@ export default function LoginPage() {
                     ¿Olvidaste tu contraseña?
                   </Link>
                 </div>
-                <Input id="password" type="password" required />
+                <Input id="password" name="password" type="password" required />
+                {state.errors?.password && <p className="text-sm font-medium text-destructive">{state.errors.password[0]}</p>}
               </div>
-              <Button type="submit" className="w-full" asChild>
-                <Link href="/dashboard">Iniciar Sesión</Link>
-              </Button>
-            </div>
+              <SubmitButton />
+            </form>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
