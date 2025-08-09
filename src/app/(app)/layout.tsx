@@ -29,9 +29,11 @@ import {
   LogOut,
   CircleUser,
   Settings,
+  Fingerprint,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { PropsWithChildren } from 'react';
+import React from 'react';
 
 function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -65,6 +67,7 @@ const navItems = [
     { href: "/appointments", icon: Calendar, label: "Citas" },
     { href: "/services", icon: Sparkles, label: "Servicios" },
     { href: "/staff", icon: Users, label: "Personal" },
+    { href: "/roles", icon: Fingerprint, label: "Roles" },
     { href: "/budgets", icon: Wand2, label: "Presupuestos" },
 ]
 

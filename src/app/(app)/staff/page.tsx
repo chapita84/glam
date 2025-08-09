@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MoreHorizontal, PlusCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const staffMembers = [
   { name: "Jessica Miller", email: "jessica@glamdash.com", role: "Estilista Principal", avatar: "JM" },
@@ -57,15 +58,28 @@ export default function StaffPage() {
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle>Invitar Nuevo Personal</DialogTitle>
+                        <DialogTitle>Invitar Nuevo Miembro del Personal</DialogTitle>
                         <DialogDescription>
-                            Introduce el correo electrónico de la persona que quieres invitar a tu equipo.
+                            Introduce el correo electrónico y asigna un rol a la persona que quieres invitar a tu equipo.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="email" className="text-right">Correo Electrónico</Label>
                             <Input id="email" type="email" placeholder="staff@example.com" className="col-span-3" />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="role" className="text-right">Rol</Label>
+                             <Select>
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Selecciona un rol" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="stylist">Estilista</SelectItem>
+                                    <SelectItem value="receptionist">Recepcionista</SelectItem>
+                                    <SelectItem value="manager">Gerente</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                     <DialogFooter>
