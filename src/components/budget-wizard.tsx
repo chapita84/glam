@@ -263,7 +263,7 @@ export function BudgetWizard() {
                         <span>${totalARS.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                 </div>
-                {isClient && (
+                {isClient && currentStep === 3 && (
                   <PDFDownloadLink
                     document={<BudgetPDF data={budgetData} />}
                     fileName={pdfFileName}
@@ -300,3 +300,5 @@ export function BudgetWizard() {
     </div>
   )
 }
+
+    
