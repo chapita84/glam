@@ -174,7 +174,7 @@ export const BudgetPDF = ({ data }: BudgetPDFProps) => {
                 <Text style={styles.sectionTitle}>Detalles del Evento</Text>
                 <View style={styles.row}>
                     <Text>Tipo de Evento:</Text>
-                    <Text style={styles.textBold}>{data.eventType}</Text>
+                    <Text style={styles.textBold}>{data.eventType || 'No especificado'}</Text>
                 </View>
                 <View style={styles.row}>
                     <Text>Fecha:</Text>
@@ -182,7 +182,7 @@ export const BudgetPDF = ({ data }: BudgetPDFProps) => {
                 </View>
                 <View style={styles.row}>
                     <Text>Ubicación:</Text>
-                    <Text style={styles.textBold}>{data.eventLocation}</Text>
+                    <Text style={styles.textBold}>{data.eventLocation || 'No especificada'}</Text>
                 </View>
             </View>
 
@@ -198,9 +198,9 @@ export const BudgetPDF = ({ data }: BudgetPDFProps) => {
                     {data.services.map((service, index) => (
                         <View style={styles.tableRow} key={index}>
                             <View style={styles.tableCol}><Text style={styles.text}>{service.name}</Text></View>
-                            <View style={styles.tableCol}><Text style={styles.text}>{service.quantity}</Text></View>
-                            <View style={styles.tableCol}><Text style={styles.text}>${service.price.toFixed(2)}</Text></View>
-                            <View style={styles.tableCol}><Text style={styles.text}>${(service.quantity * service.price).toFixed(2)}</Text></View>
+                            <View style={styles.tableCol}><Text style={styles.text}>{service.quantity || 0}</Text></View>
+                            <View style={styles.tableCol}><Text style={styles.text}>${(service.price || 0).toFixed(2)}</Text></View>
+                            <View style={styles.tableCol}><Text style={styles.text}>${((service.quantity || 0) * (service.price || 0)).toFixed(2)}</Text></View>
                         </View>
                     ))}
                 </View>
@@ -209,22 +209,22 @@ export const BudgetPDF = ({ data }: BudgetPDFProps) => {
             <View style={styles.totalSection}>
                     <View style={styles.totalRow}>
                         <Text>Subtotal Servicios:</Text>
-                        <Text>${data.servicesTotal.toFixed(2)} USD</Text>
+                        <Text>${(data.servicesTotal || 0).toFixed(2)} USD</Text>
                     </View>
                     <View style={styles.totalRow}>
                         <Text>Logística y Viáticos:</Text>
-                        <Text>${data.logisticsCost.toFixed(2)} USD</Text>
+                        <Text>${(data.logisticsCost || 0).toFixed(2)} USD</Text>
                     </View>
                     <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>TOTAL (USD):</Text>
-                        <Text style={styles.totalValue}>${data.totalUSD.toFixed(2)}</Text>
+                        <Text style={styles.totalValue}>${(data.totalUSD || 0).toFixed(2)}</Text>
                     </View>
                     <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>TOTAL (ARS):</Text>
-                        <Text style={styles.totalValue}>${data.totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        <Text style={styles.totalValue}>${(data.totalARS || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                     <View style={styles.row}>
-                        <Text style={{fontSize: 9, color: 'grey'}}>Tasa de cambio utilizada: 1 USD = {data.usdRate} ARS</Text>
+                        <Text style={{fontSize: 9, color: 'grey'}}>Tasa de cambio utilizada: 1 USD = {data.usdRate || 0} ARS</Text>
                     </View>
             </View>
             
