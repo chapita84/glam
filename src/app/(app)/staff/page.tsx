@@ -1,3 +1,7 @@
+
+'use client'
+
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,7 +41,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MoreHorizontal, PlusCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const staffMembers = [
+const initialStaffMembers = [
   { name: "Jessica Miller", email: "jessica@glamdash.com", role: "Estilista Principal", avatar: "JM" },
   { name: "Monica Evans", email: "monica@glamdash.com", role: "Estilista", avatar: "ME" },
   { name: "Sophie Chen", email: "sophie@glamdash.com", role: "Artista de Uñas", avatar: "SC" },
@@ -54,11 +58,33 @@ const roles = [
 
 
 export default function StaffPage() {
+  const [staffMembers, setStaffMembers] = useState(initialStaffMembers)
+  const [open, setOpen] = useState(false)
+  const [selectedRole, setSelectedRole] = useState('')
+
+  const handleInvite = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+    
+    if (email && selectedRole) {
+      const name = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const avatar = name.split(' ').map(n => n[0]).join('');
+      setStaffMembers([...staffMembers, { name, email, role: selectedRole, avatar }]);
+      setOpen(false);
+      setSelectedRole('');
+    }
+  }
+  
+  const handleDelete = (email: string) => {
+    setStaffMembers(staffMembers.filter(member => member.email !== email))
+  }
+
   return (
     <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Gestión de Personal</h1>
-            <Dialog>
+            <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                     <Button>
                         <PlusCircle className="mr-2 h-4 w-4" />
@@ -66,32 +92,34 @@ export default function StaffPage() {
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Invitar Nuevo Miembro del Personal</DialogTitle>
-                        <DialogDescription>
-                            Introduce el correo electrónico y asigna un rol a la persona que quieres invitar a tu equipo.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="email" className="text-right">Correo Electrónico</Label>
-                            <Input id="email" type="email" placeholder="staff@example.com" className="col-span-3" />
+                    <form onSubmit={handleInvite}>
+                        <DialogHeader>
+                            <DialogTitle>Invitar Nuevo Miembro del Personal</DialogTitle>
+                            <DialogDescription>
+                                Introduce el correo electrónico y asigna un rol a la persona que quieres invitar a tu equipo.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="email" className="text-right">Correo Electrónico</Label>
+                                <Input id="email" name="email" type="email" placeholder="staff@example.com" className="col-span-3" required/>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="role" className="text-right">Rol</Label>
+                                <Select onValueChange={setSelectedRole} required>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder="Selecciona un rol" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {roles.map(role => <SelectItem key={role.name} value={role.name}>{role.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="role" className="text-right">Rol</Label>
-                             <Select>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="Selecciona un rol" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {roles.map(role => <SelectItem key={role.name} value={role.name.toLowerCase()}>{role.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit">Enviar Invitación</Button>
-                    </DialogFooter>
+                        <DialogFooter>
+                            <Button type="submit">Enviar Invitación</Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
         </div>
@@ -142,7 +170,7 @@ export default function StaffPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuItem>Editar Rol</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Eliminar del Equipo</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(staff.email)}>Eliminar del Equipo</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

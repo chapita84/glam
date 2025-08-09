@@ -1,3 +1,7 @@
+
+'use client'
+
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,7 +40,7 @@ import { Label } from "@/components/ui/label"
 import { MoreHorizontal, PlusCircle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
-const roles = [
+const initialRoles = [
   { name: "Estilista Principal", permissions: 5 },
   { name: "Estilista", permissions: 4 },
   { name: "Artista de Uñas", permissions: 3 },
@@ -54,11 +58,30 @@ const permissions = [
 
 
 export default function RolesPage() {
+  const [roles, setRoles] = useState(initialRoles);
+  const [open, setOpen] = useState(false);
+
+  const handleAddRole = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const roleName = (form.elements.namedItem('role-name') as HTMLInputElement).value;
+    const selectedPermissions = permissions.filter(p => (form.elements.namedItem(`perm-${p.id}`) as HTMLInputElement).checked);
+    if(roleName) {
+      setRoles([...roles, { name: roleName, permissions: selectedPermissions.length }]);
+      setOpen(false);
+    }
+  }
+
+  const handleDeleteRole = (roleName: string) => {
+    setRoles(roles.filter(r => r.name !== roleName));
+  }
+
+
   return (
     <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Roles y Permisos</h1>
-            <Dialog>
+            <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                     <Button>
                         <PlusCircle className="mr-2 h-4 w-4" />
@@ -66,32 +89,34 @@ export default function RolesPage() {
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Crear Nuevo Rol</DialogTitle>
-                        <DialogDescription>
-                            Define un nuevo rol y asígnale permisos específicos para tu equipo.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="role-name" className="text-right">Nombre</Label>
-                            <Input id="role-name" placeholder="p. ej. Asistente" className="col-span-3" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Permisos</Label>
-                            <div className="grid gap-2">
-                                {permissions.map(p => (
-                                    <div key={p.id} className="flex items-center gap-2">
-                                        <Checkbox id={`perm-${p.id}`} />
-                                        <Label htmlFor={`perm-${p.id}`} className="font-normal">{p.label}</Label>
-                                    </div>
-                                ))}
+                    <form onSubmit={handleAddRole}>
+                        <DialogHeader>
+                            <DialogTitle>Crear Nuevo Rol</DialogTitle>
+                            <DialogDescription>
+                                Define un nuevo rol y asígnale permisos específicos para tu equipo.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="role-name" className="text-right">Nombre</Label>
+                                <Input id="role-name" name="role-name" placeholder="p. ej. Asistente" className="col-span-3" required/>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Permisos</Label>
+                                <div className="grid gap-2">
+                                    {permissions.map(p => (
+                                        <div key={p.id} className="flex items-center gap-2">
+                                            <Checkbox id={`perm-${p.id}`} name={`perm-${p.id}`} />
+                                            <Label htmlFor={`perm-${p.id}`} className="font-normal">{p.label}</Label>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit">Guardar Rol</Button>
-                    </DialogFooter>
+                        <DialogFooter>
+                            <Button type="submit">Guardar Rol</Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
         </div>
@@ -131,7 +156,7 @@ export default function RolesPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Eliminar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteRole(role.name)}>Eliminar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
