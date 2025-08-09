@@ -11,9 +11,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2, Download } from "lucide-react"
-import { BudgetPDF } from "./budget-pdf"
-import { PDFDownloadLink } from "@react-pdf/renderer"
+import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2 } from "lucide-react"
+import { BudgetDownloadButton } from "./budget-download-button"
 
 const steps = [
   { id: 1, name: "Detalles del Evento", icon: PartyPopper },
@@ -38,13 +37,6 @@ export function BudgetWizard() {
   const [services, setServices] = useState<BudgetItem[]>([]);
   const [logisticsCost, setLogisticsCost] = useState(50);
   const [usdRate, setUsdRate] = useState(900); // Tasa de cambio simulada
-  const [isClient, setIsClient] = useState(false)
-
-  // react-pdf/renderer only works on the client, so we need to track this
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
 
   const [state, formAction] = useActionState(handleGenerateBudget, {
     message: "",
@@ -263,25 +255,8 @@ export function BudgetWizard() {
                         <span>${totalARS.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                 </div>
-                {isClient && currentStep === 3 && (
-                  <PDFDownloadLink
-                    document={<BudgetPDF data={budgetData} />}
-                    fileName={pdfFileName}
-                  >
-                    {({ loading }) =>
-                      loading ? (
-                        <Button className="w-full" disabled>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Generando PDF...
-                        </Button>
-                      ) : (
-                        <Button className="w-full">
-                            <Download className="mr-2 h-4 w-4" />
-                            Exportar a PDF
-                        </Button>
-                      )
-                    }
-                  </PDFDownloadLink>
+                {currentStep === 3 && (
+                  <BudgetDownloadButton data={budgetData} fileName={pdfFileName} />
                 )}
             </div>
         )}
