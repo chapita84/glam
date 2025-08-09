@@ -17,6 +17,7 @@ import { SearchResultCard } from "@/components/search-result-card"
 const mockResults = [
     {
         name: "Estudio Belleza Total",
+        slug: "estudio-belleza-total",
         location: "Recoleta, Buenos Aires",
         rating: 4.8,
         reviewCount: 152,
@@ -27,6 +28,7 @@ const mockResults = [
     },
     {
         name: "Glamour Nails & Spa",
+        slug: "glamour-nails-spa",
         location: "Palermo, Buenos Aires",
         rating: 4.9,
         reviewCount: 210,
@@ -37,6 +39,7 @@ const mockResults = [
     },
     {
         name: "Corte & Estilo Urbano",
+        slug: "corte-estilo-urbano",
         location: "San Telmo, Buenos Aires",
         rating: 4.7,
         reviewCount: 88,
@@ -47,6 +50,7 @@ const mockResults = [
     },
      {
         name: "Oasis de Relajación",
+        slug: "oasis-de-relajacion",
         location: "Belgrano, Buenos Aires",
         rating: 5.0,
         reviewCount: 305,

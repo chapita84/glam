@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Star } from "lucide-react"
 import Image from "next/image"
 import { Button } from "./ui/button"
+import Link from "next/link"
 
 type SearchResultCardProps = {
     name: string;
@@ -17,9 +18,10 @@ type SearchResultCardProps = {
     imageUrl: string;
     categories: string[];
     priceTier: number;
+    slug: string; // Añadido para el enlace
 }
 
-export function SearchResultCard({ name, location, rating, reviewCount, services, imageUrl }: SearchResultCardProps) {
+export function SearchResultCard({ name, location, rating, reviewCount, services, imageUrl, slug }: SearchResultCardProps) {
   return (
     <Card className="overflow-hidden">
       <div className="grid md:grid-cols-3">
@@ -46,7 +48,9 @@ export function SearchResultCard({ name, location, rating, reviewCount, services
                     </div>
                 </div>
                 <div className="mt-auto flex justify-end">
-                     <Button>Ver Perfil y Reservar</Button>
+                     <Button asChild>
+                        <Link href={`/estudio/${slug}`}>Ver Perfil y Reservar</Link>
+                     </Button>
                 </div>
             </div>
           </CardContent>
