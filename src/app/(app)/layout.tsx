@@ -86,8 +86,10 @@ export default function AppLayout({ children }: PropsWithChildren) {
                 <SidebarMenuItem key={item.href}>
                     <Link href={item.href} passHref>
                         <SidebarMenuButton asChild tooltip={item.label}>
-                            <item.icon />
-                            <span>{item.label}</span>
+                            <a>
+                                <item.icon />
+                                <span>{item.label}</span>
+                            </a>
                         </SidebarMenuButton>
                     </Link>
                 </SidebarMenuItem>
@@ -99,8 +101,10 @@ export default function AppLayout({ children }: PropsWithChildren) {
             <SidebarMenuItem>
                <Link href="/login" passHref>
                 <SidebarMenuButton asChild tooltip="Logout">
-                    <LogOut />
-                    <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+                    <a>
+                        <LogOut />
+                        <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+                    </a>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -129,12 +133,15 @@ export default function AppLayout({ children }: PropsWithChildren) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem><Settings className="mr-2 h-4 w-4" />Settings</DropdownMenuItem>
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
                <DropdownMenuItem asChild>
                 <Link href="/login">
                   <LogOut className="mr-2 h-4 w-4" />
-                  Logout
+                  <span>Logout</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
