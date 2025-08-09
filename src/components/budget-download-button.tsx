@@ -1,8 +1,8 @@
 
 "use client"
 
-import { useState, useEffect } from "react";
-import { PDFDownloadLink } from "@react-pdf/renderer";
+import { useState } from "react";
+import { pdf } from "@react-pdf/renderer";
 import { Button } from "@/components/ui/button";
 import { Loader2, Download } from "lucide-react";
 import { BudgetPDF } from "./budget-pdf";
@@ -24,39 +24,41 @@ interface BudgetDownloadButtonProps {
 }
 
 export function BudgetDownloadButton({ data, fileName }: BudgetDownloadButtonProps) {
-    const [isClient, setIsClient] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    if (!isClient) {
-        return (
-            <Button className="w-full" disabled>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generando PDF...
-            </Button>
-        );
-    }
+    const handleDownload = async () => {
+        setLoading(true);
+        try {
+            const blob = await pdf(<BudgetPDF data={data} />).toBlob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            // You might want to show an error toast to the user here
+        } finally {
+            setLoading(false);
+        }
+    };
     
     return (
-        <PDFDownloadLink
-            document={<BudgetPDF data={data} />}
-            fileName={fileName}
-        >
-            {({ loading }) =>
-                loading ? (
-                    <Button className="w-full" disabled>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generando PDF...
-                    </Button>
-                ) : (
-                    <Button className="w-full">
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar a PDF
-                    </Button>
-                )
-            }
-        </PDFDownloadLink>
+         <Button onClick={handleDownload} className="w-full" disabled={loading}>
+            {loading ? (
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generando PDF...
+                </>
+            ) : (
+                <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar a PDF
+                </>
+            )}
+        </Button>
     );
 }
