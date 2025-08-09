@@ -103,6 +103,10 @@ export function BudgetWizard() {
     usdRate,
   }
 
+  const pdfFileName = eventDetails.eventType 
+    ? `Presupuesto-${eventDetails.eventType.replace(/\s+/g, '-')}.pdf`
+    : "Presupuesto.pdf";
+
   const SubmitButton = () => {
     const { pending } = useFormStatus();
     return (
@@ -262,7 +266,7 @@ export function BudgetWizard() {
                 {isClient && (
                   <PDFDownloadLink
                     document={<BudgetPDF data={budgetData} />}
-                    fileName={`Presupuesto-${eventDetails.eventType.replace(/\s+/g, '-')}.pdf`}
+                    fileName={pdfFileName}
                   >
                     {({ blob, url, loading, error }) =>
                       loading ? (
