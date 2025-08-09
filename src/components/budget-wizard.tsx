@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useActionState, useState, useEffect } from "react"
@@ -10,7 +11,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2 } from "lucide-react"
+import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2, Download } from "lucide-react"
+import { BudgetPDF } from "./budget-pdf"
+import { PDFDownloadLink } from "@react-pdf/renderer"
 
 const steps = [
   { id: 1, name: "Detalles del Evento", icon: PartyPopper },
@@ -35,6 +38,13 @@ export function BudgetWizard() {
   const [services, setServices] = useState<BudgetItem[]>([]);
   const [logisticsCost, setLogisticsCost] = useState(50);
   const [usdRate, setUsdRate] = useState(900); // Tasa de cambio simulada
+  const [isClient, setIsClient] = useState(false)
+
+  // react-pdf/renderer only works on the client, so we need to track this
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
 
   const [state, formAction] = useActionState(handleGenerateBudget, {
     message: "",
@@ -82,6 +92,16 @@ export function BudgetWizard() {
   const servicesTotal = services.reduce((total, service) => total + (service.quantity * service.price), 0);
   const totalUSD = servicesTotal + logisticsCost;
   const totalARS = totalUSD * usdRate;
+
+  const budgetData = {
+    ...eventDetails,
+    services,
+    servicesTotal,
+    logisticsCost,
+    totalUSD,
+    totalARS,
+    usdRate,
+  }
 
   const SubmitButton = () => {
     const { pending } = useFormStatus();
@@ -239,9 +259,26 @@ export function BudgetWizard() {
                         <span>${totalARS.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
                 </div>
-                 <Button className="w-full">
-                    Exportar a PDF y Enviar
-                </Button>
+                {isClient && (
+                  <PDFDownloadLink
+                    document={<BudgetPDF data={budgetData} />}
+                    fileName={`Presupuesto-${eventDetails.eventType.replace(/\s+/g, '-')}.pdf`}
+                  >
+                    {({ blob, url, loading, error }) =>
+                      loading ? (
+                        <Button className="w-full" disabled>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generando PDF...
+                        </Button>
+                      ) : (
+                        <Button className="w-full">
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar a PDF
+                        </Button>
+                      )
+                    }
+                  </PDFDownloadLink>
+                )}
             </div>
         )}
       </div>
