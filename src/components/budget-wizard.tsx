@@ -268,7 +268,7 @@ export function BudgetWizard() {
                     document={<BudgetPDF data={budgetData} />}
                     fileName={pdfFileName}
                   >
-                    {({ blob, url, loading, error }) =>
+                    {({ loading }) =>
                       loading ? (
                         <Button className="w-full" disabled>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -300,5 +300,3 @@ export function BudgetWizard() {
     </div>
   )
 }
-
-    
