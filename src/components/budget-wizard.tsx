@@ -100,7 +100,7 @@ export function BudgetWizard() {
                   </AlertDescription>
                 </Alert>
              )}
-              {state.message === 'Failed to generate budget suggestions.' && (
+              {state.message && state.message !== 'success' && (
                 <Alert variant="destructive">
                   <Terminal className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
