@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
 
 
 interface BudgetPDFProps {
-    data: {
+    data?: {
         eventType: string;
         eventDate: string;
         eventLocation: string;
@@ -151,75 +151,87 @@ interface BudgetPDFProps {
     }
 }
 
-export const BudgetPDF = ({ data }: BudgetPDFProps) => (
-  <Document>
-    <Page size="A4" style={styles.page}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Glam&Beauty Dash</Text>
-        <Text style={styles.subtitle}>Presupuesto de Servicios</Text>
-      </View>
+export const BudgetPDF = ({ data }: BudgetPDFProps) => {
+    if (!data) {
+        return (
+            <Document>
+                <Page size="A4" style={styles.page}>
+                    <Text>No hay datos para generar el presupuesto.</Text>
+                </Page>
+            </Document>
+        )
+    }
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Detalles del Evento</Text>
-        <View style={styles.row}>
-            <Text>Tipo de Evento:</Text>
-            <Text style={styles.textBold}>{data.eventType}</Text>
-        </View>
-        <View style={styles.row}>
-            <Text>Fecha:</Text>
-            <Text style={styles.textBold}>{data.eventDate ? new Date(data.eventDate).toLocaleDateString('es-AR') : 'No especificada'}</Text>
-        </View>
-        <View style={styles.row}>
-            <Text>Ubicación:</Text>
-            <Text style={styles.textBold}>{data.eventLocation}</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Servicios Cotizados</Text>
-        <View style={styles.table}>
-            <View style={styles.tableRow}>
-                <View style={styles.tableColHeader}><Text style={styles.text}>Servicio</Text></View>
-                <View style={styles.tableColHeader}><Text style={styles.text}>Cantidad</Text></View>
-                <View style={styles.tableColHeader}><Text style={styles.text}>Precio (USD)</Text></View>
-                <View style={styles.tableColHeader}><Text style={styles.text}>Subtotal (USD)</Text></View>
+    return (
+        <Document>
+            <Page size="A4" style={styles.page}>
+            <View style={styles.header}>
+                <Text style={styles.title}>Glam&Beauty Dash</Text>
+                <Text style={styles.subtitle}>Presupuesto de Servicios</Text>
             </View>
-            {data.services.map((service, index) => (
-                <View style={styles.tableRow} key={index}>
-                    <View style={styles.tableCol}><Text style={styles.text}>{service.name}</Text></View>
-                    <View style={styles.tableCol}><Text style={styles.text}>{service.quantity}</Text></View>
-                    <View style={styles.tableCol}><Text style={styles.text}>${service.price.toFixed(2)}</Text></View>
-                    <View style={styles.tableCol}><Text style={styles.text}>${(service.quantity * service.price).toFixed(2)}</Text></View>
+
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Detalles del Evento</Text>
+                <View style={styles.row}>
+                    <Text>Tipo de Evento:</Text>
+                    <Text style={styles.textBold}>{data.eventType}</Text>
                 </View>
-            ))}
-        </View>
-      </View>
-      
-       <View style={styles.totalSection}>
-            <View style={styles.totalRow}>
-                <Text>Subtotal Servicios:</Text>
-                <Text>${data.servicesTotal.toFixed(2)} USD</Text>
+                <View style={styles.row}>
+                    <Text>Fecha:</Text>
+                    <Text style={styles.textBold}>{data.eventDate ? new Date(data.eventDate).toLocaleDateString('es-AR') : 'No especificada'}</Text>
+                </View>
+                <View style={styles.row}>
+                    <Text>Ubicación:</Text>
+                    <Text style={styles.textBold}>{data.eventLocation}</Text>
+                </View>
             </View>
-             <View style={styles.totalRow}>
-                <Text>Logística y Viáticos:</Text>
-                <Text>${data.logisticsCost.toFixed(2)} USD</Text>
+
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Servicios Cotizados</Text>
+                <View style={styles.table}>
+                    <View style={styles.tableRow}>
+                        <View style={styles.tableColHeader}><Text style={styles.text}>Servicio</Text></View>
+                        <View style={styles.tableColHeader}><Text style={styles.text}>Cantidad</Text></View>
+                        <View style={styles.tableColHeader}><Text style={styles.text}>Precio (USD)</Text></View>
+                        <View style={styles.tableColHeader}><Text style={styles.text}>Subtotal (USD)</Text></View>
+                    </View>
+                    {data.services.map((service, index) => (
+                        <View style={styles.tableRow} key={index}>
+                            <View style={styles.tableCol}><Text style={styles.text}>{service.name}</Text></View>
+                            <View style={styles.tableCol}><Text style={styles.text}>{service.quantity}</Text></View>
+                            <View style={styles.tableCol}><Text style={styles.text}>${service.price.toFixed(2)}</Text></View>
+                            <View style={styles.tableCol}><Text style={styles.text}>${(service.quantity * service.price).toFixed(2)}</Text></View>
+                        </View>
+                    ))}
+                </View>
             </View>
-             <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>TOTAL (USD):</Text>
-                <Text style={styles.totalValue}>${data.totalUSD.toFixed(2)}</Text>
+            
+            <View style={styles.totalSection}>
+                    <View style={styles.totalRow}>
+                        <Text>Subtotal Servicios:</Text>
+                        <Text>${data.servicesTotal.toFixed(2)} USD</Text>
+                    </View>
+                    <View style={styles.totalRow}>
+                        <Text>Logística y Viáticos:</Text>
+                        <Text>${data.logisticsCost.toFixed(2)} USD</Text>
+                    </View>
+                    <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>TOTAL (USD):</Text>
+                        <Text style={styles.totalValue}>${data.totalUSD.toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.totalRow}>
+                        <Text style={styles.totalLabel}>TOTAL (ARS):</Text>
+                        <Text style={styles.totalValue}>${data.totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    </View>
+                    <View style={styles.row}>
+                        <Text style={{fontSize: 9, color: 'grey'}}>Tasa de cambio utilizada: 1 USD = {data.usdRate} ARS</Text>
+                    </View>
             </View>
-            <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>TOTAL (ARS):</Text>
-                <Text style={styles.totalValue}>${data.totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-            </View>
-             <View style={styles.row}>
-                <Text style={{fontSize: 9, color: 'grey'}}>Tasa de cambio utilizada: 1 USD = {data.usdRate} ARS</Text>
-             </View>
-       </View>
-       
-       <Text style={styles.footer}>
-         Presupuesto generado con Glam&Beauty Dash. Válido por 15 días.
-       </Text>
-    </Page>
-  </Document>
-);
+            
+            <Text style={styles.footer}>
+                Presupuesto generado con Glam&Beauty Dash. Válido por 15 días.
+            </Text>
+            </Page>
+        </Document>
+    )
+};
