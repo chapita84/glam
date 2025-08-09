@@ -15,7 +15,7 @@ import {z} from 'genkit';
 const GenerateBudgetInputSchema = z.object({
   eventTypeDescription: z
     .string()
-    .describe('A description of the event type for which to generate a budget.'),
+    .describe('Una descripción del tipo de evento para el cual generar un presupuesto.'),
 });
 export type GenerateBudgetInput = z.infer<typeof GenerateBudgetInputSchema>;
 
@@ -23,7 +23,7 @@ const GenerateBudgetOutputSchema = z.object({
   suggestedServices: z
     .string()
     .describe(
-      'A list of suggested services and pricing configuration based on the event type description.'
+      'Una lista de servicios sugeridos y configuración de precios basada en la descripción del tipo de evento.'
     ),
 });
 export type GenerateBudgetOutput = z.infer<typeof GenerateBudgetOutputSchema>;
@@ -36,11 +36,11 @@ const prompt = ai.definePrompt({
   name: 'generateBudgetPrompt',
   input: {schema: GenerateBudgetInputSchema},
   output: {schema: GenerateBudgetOutputSchema},
-  prompt: `You are an AI assistant helping tenant owners generate budgets for their events.
+  prompt: `Eres un asistente de IA que ayuda a los propietarios de inquilinos a generar presupuestos para sus eventos.
 
-  Based on the event type description, suggest a list of services and pricing configuration.
+  Basado en la descripción del tipo de evento, sugiere una lista de servicios y configuración de precios.
 
-  Event Type Description: {{{eventTypeDescription}}}
+  Descripción del Tipo de Evento: {{{eventTypeDescription}}}
   `,
 });
 

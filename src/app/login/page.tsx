@@ -63,20 +63,20 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-4">
         <div className="text-center mb-8">
             <SparkleIcon className="mx-auto h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-wider mt-2">GlamDash</h1>
-            <p className="text-muted-foreground">Welcome back! Please sign in to your account.</p>
+            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty Dash</h1>
+            <p className="text-muted-foreground">¡Bienvenido de nuevo! Por favor, inicia sesión en tu cuenta.</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Login</CardTitle>
+            <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
             <CardDescription>
-              Enter your email below to login to your account
+              Ingresa tu correo electrónico a continuación para iniciar sesión en tu cuenta
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Correo Electrónico</Label>
                 <Input
                   id="email"
                   type="email"
@@ -86,18 +86,18 @@ export default function LoginPage() {
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Contraseña</Label>
                   <Link
                     href="#"
                     className="ml-auto inline-block text-sm underline"
                   >
-                    Forgot your password?
+                    ¿Olvidaste tu contraseña?
                   </Link>
                 </div>
                 <Input id="password" type="password" required />
               </div>
               <Button type="submit" className="w-full" asChild>
-                <Link href="/dashboard">Login</Link>
+                <Link href="/dashboard">Iniciar Sesión</Link>
               </Button>
             </div>
             <div className="relative my-6">
@@ -106,7 +106,7 @@ export default function LoginPage() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with
+                  O continuar con
                 </span>
               </div>
             </div>
@@ -115,9 +115,9 @@ export default function LoginPage() {
                 <Button variant="outline"><FacebookIcon className="mr-2 h-4 w-4"/>Facebook</Button>
             </div>
             <div className="mt-6 text-center text-sm">
-              Don&apos;t have an account?{" "}
+              ¿No tienes una cuenta?{" "}
               <Link href="#" className="underline">
-                Sign up
+                Regístrate
               </Link>
             </div>
           </CardContent>

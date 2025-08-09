@@ -12,10 +12,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2 } from "lucide-react"
 
 const steps = [
-  { id: 1, name: "Event Details", icon: PartyPopper },
-  { id: 2, name: "Services", icon: Wand2 },
-  { id: 3, name: "Logistics", icon: Truck },
-  { id: 4, name: "Summary", icon: FileText },
+  { id: 1, name: "Detalles del Evento", icon: PartyPopper },
+  { id: 2, name: "Servicios", icon: Wand2 },
+  { id: 3, name: "Logística", icon: Truck },
+  { id: 4, name: "Resumen", icon: FileText },
 ]
 
 export function BudgetWizard() {
@@ -45,7 +45,7 @@ export function BudgetWizard() {
     return (
         <Button type="submit" disabled={pending}>
             {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-            Generate Suggestions
+            Generar Sugerencias
         </Button>
     )
   }
@@ -55,23 +55,23 @@ export function BudgetWizard() {
       <Progress value={progress} className="mb-8" />
       <div className="mb-8">
         <h2 className="text-2xl font-bold">{steps[currentStep].name}</h2>
-        <p className="text-muted-foreground">Step {currentStep + 1} of {steps.length}</p>
+        <p className="text-muted-foreground">Paso {currentStep + 1} de {steps.length}</p>
       </div>
 
       <div className="space-y-6">
         {currentStep === 0 && (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="eventType">Event Type</Label>
-              <Input id="eventType" placeholder="e.g., Wedding, Corporate Gala" />
+              <Label htmlFor="eventType">Tipo de Evento</Label>
+              <Input id="eventType" placeholder="p. ej., Boda, Gala Corporativa" />
             </div>
             <div>
-              <Label htmlFor="eventDate">Event Date</Label>
+              <Label htmlFor="eventDate">Fecha del Evento</Label>
               <Input id="eventDate" type="date" />
             </div>
             <div>
-              <Label htmlFor="eventLocation">Location</Label>
-              <Input id="eventLocation" placeholder="e.g., 123 Main St, Anytown" />
+              <Label htmlFor="eventLocation">Ubicación</Label>
+              <Input id="eventLocation" placeholder="p. ej., Calle Principal 123, Cualquier Ciudad" />
             </div>
           </div>
         )}
@@ -80,11 +80,11 @@ export function BudgetWizard() {
           <div className="space-y-6">
              <form action={formAction} className="space-y-4">
                 <div>
-                  <Label htmlFor="eventTypeDescription">Describe the event style</Label>
+                  <Label htmlFor="eventTypeDescription">Describe el estilo del evento</Label>
                   <Textarea
                     id="eventTypeDescription"
                     name="eventTypeDescription"
-                    placeholder="e.g., 'A romantic and classic wedding with a focus on natural beauty.' or 'A modern and chic 15th birthday party.'"
+                    placeholder="p. ej., 'Una boda romántica y clásica con un enfoque en la belleza natural.' o 'Una fiesta de 15 años moderna y chic.'"
                     rows={4}
                   />
                   {state.errors?.eventTypeDescription && <p className="text-sm font-medium text-destructive">{state.errors.eventTypeDescription[0]}</p>}
@@ -94,7 +94,7 @@ export function BudgetWizard() {
              {state.message === 'success' && state.data && (
                 <Alert>
                   <Wand2 className="h-4 w-4" />
-                  <AlertTitle>AI Suggestions</AlertTitle>
+                  <AlertTitle>Sugerencias de IA</AlertTitle>
                   <AlertDescription className="whitespace-pre-wrap">
                     {state.data}
                   </AlertDescription>
@@ -115,10 +115,10 @@ export function BudgetWizard() {
         {currentStep === 2 && (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="travelCost">Travel Cost</Label>
+              <Label htmlFor="travelCost">Costo de Viaje</Label>
               <Input id="travelCost" type="number" placeholder="$" />
             </div>
-            <p className="text-sm text-muted-foreground">Enter any travel or viatics costs associated with the event.</p>
+            <p className="text-sm text-muted-foreground">Introduce cualquier costo de viaje o viáticos asociados con el evento.</p>
           </div>
         )}
 
@@ -126,22 +126,22 @@ export function BudgetWizard() {
             <div className="space-y-6">
                  <Alert>
                   <FileText className="h-4 w-4" />
-                  <AlertTitle>Budget Summary</AlertTitle>
+                  <AlertTitle>Resumen del Presupuesto</AlertTitle>
                   <AlertDescription>
-                    Review the details below before finalizing the budget.
+                    Revisa los detalles a continuación antes de finalizar el presupuesto.
                   </AlertDescription>
                 </Alert>
                 <div className="p-6 border rounded-lg space-y-4">
                     <div className="flex justify-between">
-                        <span className="text-muted-foreground">Event Type:</span>
-                        <span className="font-medium">Wedding</span>
+                        <span className="text-muted-foreground">Tipo de Evento:</span>
+                        <span className="font-medium">Boda</span>
                     </div>
                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Services:</span>
+                        <span className="text-muted-foreground">Servicios:</span>
                         <span className="font-medium">$1,200.00</span>
                     </div>
                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Logistics:</span>
+                        <span className="text-muted-foreground">Logística:</span>
                         <span className="font-medium">$50.00</span>
                     </div>
                      <div className="flex justify-between text-lg font-bold border-t pt-4 mt-4">
@@ -154,7 +154,7 @@ export function BudgetWizard() {
                     </div>
                 </div>
                  <Button className="w-full">
-                    Export to PDF & Send
+                    Exportar a PDF y Enviar
                 </Button>
             </div>
         )}
@@ -162,12 +162,12 @@ export function BudgetWizard() {
 
       <div className="mt-8 flex justify-between">
         <Button variant="outline" onClick={handlePrev} disabled={currentStep === 0}>
-          Previous
+          Anterior
         </Button>
         {currentStep < steps.length - 1 ? (
-          <Button onClick={handleNext}>Next</Button>
+          <Button onClick={handleNext}>Siguiente</Button>
         ) : (
-          <Button disabled>Complete</Button>
+          <Button disabled>Completar</Button>
         )}
       </div>
     </div>

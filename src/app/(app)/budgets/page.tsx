@@ -11,13 +11,13 @@ export default function BudgetsPage() {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Smart Budget Tool</h1>
+                <h1 className="text-3xl font-bold tracking-tight">Herramienta de Presupuesto Inteligente</h1>
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Create a New Event Budget</CardTitle>
+                    <CardTitle>Crear un Nuevo Presupuesto de Evento</CardTitle>
                     <CardDescription>
-                        Follow the steps to generate a detailed budget for your clients' events. Use our AI assistant to get service suggestions.
+                        Sigue los pasos para generar un presupuesto detallado para los eventos de tus clientes. Usa nuestro asistente de IA para obtener sugerencias de servicios.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

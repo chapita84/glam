@@ -61,11 +61,11 @@ function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { href: "/appointments", icon: Calendar, label: "Appointments" },
-    { href: "/services", icon: Sparkles, label: "Services" },
-    { href: "/staff", icon: Users, label: "Staff" },
-    { href: "/budgets", icon: Wand2, label: "Budgets" },
+    { href: "/dashboard", icon: LayoutDashboard, label: "Panel" },
+    { href: "/appointments", icon: Calendar, label: "Citas" },
+    { href: "/services", icon: Sparkles, label: "Servicios" },
+    { href: "/staff", icon: Users, label: "Personal" },
+    { href: "/budgets", icon: Wand2, label: "Presupuestos" },
 ]
 
 export default function AppLayout({ children }: PropsWithChildren) {
@@ -76,7 +76,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             <div className="flex items-center gap-2 p-2">
                 <SparkleIcon className="w-8 h-8 text-sidebar-primary" />
                 <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsible=icon]:hidden">
-                    GlamDash
+                    Glam&Beauty Dash
                 </h1>
             </div>
         </SidebarHeader>
@@ -97,10 +97,10 @@ export default function AppLayout({ children }: PropsWithChildren) {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Logout">
+                <SidebarMenuButton asChild tooltip="Cerrar Sesión">
                     <Link href="/login">
                         <LogOut />
-                        <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+                        <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
@@ -127,17 +127,17 @@ export default function AppLayout({ children }: PropsWithChildren) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+                <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
                <DropdownMenuItem asChild>
                 <Link href="/login">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
+                  <span>Cerrar Sesión</span>
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
