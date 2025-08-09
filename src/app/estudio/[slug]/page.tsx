@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, Clock, MapPin, Phone } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 const mockStudioData = {
     name: "Estudio Belleza Total",
@@ -70,7 +71,9 @@ export default function StudioProfilePage({ params }: { params: { slug: string }
                                     <span className="text-sm text-muted-foreground">({studio.reviewCount} reseñas)</span>
                                 </div>
                             </div>
-                            <Button size="lg" className="w-full md:w-auto">Reservar Turno</Button>
+                             <Button size="lg" className="w-full md:w-auto" asChild>
+                                <Link href="/appointments">Reservar Turno</Link>
+                            </Button>
                         </div>
                     </Card>
                 </div>
@@ -97,7 +100,9 @@ export default function StudioProfilePage({ params }: { params: { slug: string }
                                     </CardHeader>
                                     <CardContent>
                                         <p className="text-sm text-muted-foreground">{service.description}</p>
-                                        <Button className="w-full mt-4">Añadir a la Reserva</Button>
+                                        <Button className="w-full mt-4" asChild>
+                                            <Link href="/appointments">Añadir a la Reserva</Link>
+                                        </Button>
                                     </CardContent>
                                 </Card>
                             ))}
