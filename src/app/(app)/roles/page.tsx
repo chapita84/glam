@@ -41,6 +41,7 @@ const roles = [
   { name: "Estilista", permissions: 4 },
   { name: "Artista de Uñas", permissions: 3 },
   { name: "Recepcionista", permissions: 2 },
+  { name: "Propietario", permissions: 5 },
 ]
 
 const permissions = [
@@ -117,12 +118,12 @@ export default function RolesPage() {
                 <TableRow key={role.name}>
                   <TableCell className="font-medium">{role.name}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{role.permissions} de {permissions.length}</Badge>
+                    <Badge variant={role.name === "Propietario" ? "default" : "secondary"}>{role.permissions} de {permissions.length}</Badge>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                        <Button aria-haspopup="true" size="icon" variant="ghost" disabled={role.name === 'Propietario'}>
                           <MoreHorizontal className="h-4 w-4" />
                           <span className="sr-only">Menú</span>
                         </Button>
@@ -130,7 +131,7 @@ export default function RolesPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuItem>Editar</DropdownMenuItem>
-                        <DropdownMenuItem>Eliminar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">Eliminar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

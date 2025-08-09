@@ -44,6 +44,15 @@ const staffMembers = [
   { name: "Usuario Admin", email: "admin@glamdash.com", role: "Propietario", avatar: "AU" },
 ]
 
+const roles = [
+  { name: "Estilista Principal" },
+  { name: "Estilista" },
+  { name: "Artista de Uñas" },
+  { name: "Recepcionista" },
+  { name: "Propietario" },
+]
+
+
 export default function StaffPage() {
   return (
     <div className="flex flex-col gap-6">
@@ -75,9 +84,7 @@ export default function StaffPage() {
                                     <SelectValue placeholder="Selecciona un rol" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="stylist">Estilista</SelectItem>
-                                    <SelectItem value="receptionist">Recepcionista</SelectItem>
-                                    <SelectItem value="manager">Gerente</SelectItem>
+                                    {roles.map(role => <SelectItem key={role.name} value={role.name.toLowerCase()}>{role.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -135,7 +142,7 @@ export default function StaffPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                         <DropdownMenuItem>Editar Rol</DropdownMenuItem>
-                        <DropdownMenuItem>Eliminar del Equipo</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">Eliminar del Equipo</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
