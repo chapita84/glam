@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useFormState, useFormStatus } from "react-dom"
+import { useActionState, useState } from "react"
+import { useFormStatus } from "react-dom"
 import { handleGenerateBudget } from "@/app/(app)/budgets/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,7 +22,7 @@ export function BudgetWizard() {
   const [currentStep, setCurrentStep] = useState(0)
   const [formData, setFormData] = useState({})
   
-  const [state, formAction] = useFormState(handleGenerateBudget, {
+  const [state, formAction] = useActionState(handleGenerateBudget, {
     message: "",
   })
 
