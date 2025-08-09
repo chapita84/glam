@@ -84,14 +84,12 @@ export default function AppLayout({ children }: PropsWithChildren) {
           <SidebarMenu>
             {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                    <Link href={item.href} passHref>
-                        <SidebarMenuButton asChild tooltip={item.label}>
-                            <a>
-                                <item.icon />
-                                <span>{item.label}</span>
-                            </a>
-                        </SidebarMenuButton>
-                    </Link>
+                    <SidebarMenuButton asChild tooltip={item.label}>
+                        <Link href={item.href}>
+                            <item.icon />
+                            <span>{item.label}</span>
+                        </Link>
+                    </SidebarMenuButton>
                 </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -99,14 +97,12 @@ export default function AppLayout({ children }: PropsWithChildren) {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-               <Link href="/login" passHref>
                 <SidebarMenuButton asChild tooltip="Logout">
-                    <a>
+                    <Link href="/login">
                         <LogOut />
                         <span className="group-data-[collapsible=icon]:hidden">Logout</span>
-                    </a>
+                    </Link>
                 </SidebarMenuButton>
-              </Link>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
