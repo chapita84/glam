@@ -15,6 +15,8 @@ type SearchResultCardProps = {
     reviewCount: number;
     services: string[];
     imageUrl: string;
+    categories: string[];
+    priceTier: number;
 }
 
 export function SearchResultCard({ name, location, rating, reviewCount, services, imageUrl }: SearchResultCardProps) {
