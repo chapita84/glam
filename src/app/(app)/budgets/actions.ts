@@ -7,9 +7,15 @@ const budgetSchema = z.object({
   eventTypeDescription: z.string().min(10, "Por favor, proporciona una descripción más detallada (al menos 10 caracteres)."),
 })
 
+export type BudgetItem = {
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 type FormState = {
   message: string;
-  data?: string;
+  data?: BudgetItem[];
   errors?: {
     eventTypeDescription?: string[];
   }

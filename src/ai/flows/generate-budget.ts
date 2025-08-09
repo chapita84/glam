@@ -19,11 +19,16 @@ const GenerateBudgetInputSchema = z.object({
 });
 export type GenerateBudgetInput = z.infer<typeof GenerateBudgetInputSchema>;
 
+const BudgetItemSchema = z.object({
+    name: z.string().describe('El nombre del servicio o ítem del presupuesto.'),
+    quantity: z.number().describe('La cantidad de este servicio.'),
+    price: z.number().describe('El precio unitario de este servicio.'),
+});
+
 const GenerateBudgetOutputSchema = z.object({
-  suggestedServices: z
-    .string()
+  suggestedServices: z.array(BudgetItemSchema)
     .describe(
-      'Una lista de servicios sugeridos y configuración de precios basada en la descripción del tipo de evento.'
+      'Una lista de objetos de servicio sugeridos, cada uno con nombre, cantidad y precio, basada en la descripción del tipo de evento.'
     ),
 });
 export type GenerateBudgetOutput = z.infer<typeof GenerateBudgetOutputSchema>;
@@ -36,9 +41,9 @@ const prompt = ai.definePrompt({
   name: 'generateBudgetPrompt',
   input: {schema: GenerateBudgetInputSchema},
   output: {schema: GenerateBudgetOutputSchema},
-  prompt: `Eres un asistente de IA que ayuda a los propietarios de inquilinos a generar presupuestos para sus eventos.
+  prompt: `Eres un asistente de IA que ayuda a los propietarios de salones de belleza a generar presupuestos para sus eventos.
 
-  Basado en la descripción del tipo de evento, sugiere una lista de servicios y configuración de precios.
+  Basado en la descripción del tipo de evento, sugiere una lista de servicios y configuración de precios. Asegúrate de devolver un array de objetos de servicio.
 
   Descripción del Tipo de Evento: {{{eventTypeDescription}}}
   `,
