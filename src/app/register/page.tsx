@@ -56,25 +56,28 @@ function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-4">
         <div className="text-center mb-8">
             <SparkleIcon className="mx-auto h-12 w-12 text-primary" />
             <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty Dash</h1>
-            <p className="text-muted-foreground">¡Bienvenido de nuevo! Por favor, inicia sesión en tu cuenta.</p>
+            <p className="text-muted-foreground">Crea una cuenta para empezar a gestionar tu estudio o reservar servicios.</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
+            <CardTitle className="text-2xl">Crear una cuenta</CardTitle>
             <CardDescription>
-              Ingresa tu correo electrónico a continuación para acceder a tu cuenta.
+              Ingresa tus datos a continuación para crear tu cuenta.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="full-name">Nombre Completo</Label>
+                <Input id="full-name" placeholder="Tu Nombre" required />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
                 <Input
@@ -85,19 +88,11 @@ export default function LoginPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="ml-auto inline-block text-sm underline"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </Link>
-                </div>
+                <Label htmlFor="password">Contraseña</Label>
                 <Input id="password" type="password" required />
               </div>
               <Button type="submit" className="w-full" asChild>
-                <Link href="/dashboard">Iniciar Sesión</Link>
+                <Link href="/dashboard">Crear Cuenta</Link>
               </Button>
             </div>
             <div className="relative my-6">
@@ -106,18 +101,18 @@ export default function LoginPage() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">
-                  O continuar con
+                  O registrarse con
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline"><GoogleIcon className="mr-2 h-4 w-4"/>Google</Button>
-                <Button variant="outline"><FacebookIcon className="mr-2 h-4 w-4"/>Facebook</Button>
+              <Button variant="outline"><GoogleIcon className="mr-2 h-4 w-4" /> Google</Button>
+              <Button variant="outline"><FacebookIcon className="mr-2 h-4 w-4" /> Facebook</Button>
             </div>
             <div className="mt-6 text-center text-sm">
-              ¿No tienes una cuenta?{" "}
-              <Link href="/register" className="underline">
-                Regístrate
+              ¿Ya tienes una cuenta?{" "}
+              <Link href="/login" className="underline">
+                Iniciar Sesión
               </Link>
             </div>
           </CardContent>
