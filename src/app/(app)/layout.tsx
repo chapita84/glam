@@ -13,6 +13,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   Sidebar,
@@ -36,9 +39,13 @@ import {
   LogOut,
   CircleUser,
   Settings,
+  Sun,
+  Moon,
+  Laptop
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTheme } from 'next-themes';
 
 const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Panel" },
@@ -78,6 +85,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
   const [config, setConfig] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
+  const { setTheme } = useTheme();
 
   // Using a mock tenantId for now.
   const tenantId = "test-tenant";
@@ -189,6 +197,27 @@ export default function AppLayout({ children }: PropsWithChildren) {
                     <span>Ajustes</span>
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                      <Sun className="h-4 w-4 mr-2 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                      <Moon className="absolute h-4 w-4 mr-2 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                      <span>Tema</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                      <DropdownMenuItem onClick={() => setTheme("light")}>
+                          <Sun className="mr-2 h-4 w-4" />
+                          <span>Claro</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("dark")}>
+                          <Moon className="mr-2 h-4 w-4" />
+                          <span>Oscuro</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("system")}>
+                          <Laptop className="mr-2 h-4 w-4" />
+                          <span>Sistema</span>
+                      </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
                <DropdownMenuItem asChild>
                 <Link href="/login">
