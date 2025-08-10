@@ -39,33 +39,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
-    return (
-      <svg
-        {...props}
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M9.93 2.13a2.47 2.47 0 0 1 4.14 0l.47.8a9.49 9.49 0 0 0 5.16 5.16l.8.47a2.47 2.47 0 0 1 0 4.14l-.8.47a9.49 9.49 0 0 0-5.16 5.16l-.47.8a2.47 2.47 0 0 1-4.14 0l-.47-.8a9.49 9.49 0 0 0-5.16-5.16l-.8-.47a2.47 2.47 0 0 1 0-4.14l.8-.47a9.49 9.49 0 0 0 5.16-5.16z" />
-        <path d="M12 2v2" />
-        <path d="M12 20v2" />
-        <path d="m4.93 4.93 1.41 1.41" />
-        <path d="m17.66 17.66 1.41 1.41" />
-        <path d="M2 12h2" />
-        <path d="M20 12h2" />
-        <path d="m4.93 19.07 1.41-1.41" />
-        <path d="m17.66 6.34 1.41-1.41" />
-      </svg>
-    );
-}
-
 const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Panel" },
     { href: "/appointments", icon: Calendar, label: "Citas" },
@@ -139,9 +112,9 @@ export default function AppLayout({ children }: PropsWithChildren) {
       <Sidebar side="left" variant="sidebar" collapsible="icon">
         <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
-                <SparkleIcon className="w-8 h-8 text-sidebar-primary" />
+                <Fingerprint className="w-8 h-8 text-sidebar-primary" />
                 <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsible=icon]:hidden">
-                    Glam&Beauty Dash
+                    GlamDash
                 </h1>
             </div>
         </SidebarHeader>
