@@ -57,6 +57,7 @@ const navItems = [
     { href: "/roles", icon: Fingerprint, label: "Roles" },
     { href: "/budgets", icon: Wand2, label: "Presupuestos" },
     { href: "/billing", icon: CreditCard, label: "Facturación" },
+    { href: "/settings", icon: Settings, label: "Ajustes" },
 ]
 
 export type Permission = {
@@ -170,14 +171,6 @@ export default function AppLayout({ children }: PropsWithChildren) {
                     <Link href="/login">
                         <LogOut />
                         <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
-                    </Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Ajustes">
-                    <Link href="/settings">
-                        <Settings />
-                        <span className="group-data-[collapsible=icon]:hidden">Ajustes</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
