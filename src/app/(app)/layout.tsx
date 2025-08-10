@@ -270,5 +270,3 @@ export default function AppLayout({ children }: PropsWithChildren) {
     </SidebarProvider>
   );
 }
-
-    
