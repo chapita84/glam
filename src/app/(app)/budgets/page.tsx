@@ -7,27 +7,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PlusCircle, MoreHorizontal } from "lucide-react";
-import { type Budget, deleteBudget } from "@/lib/firebase/firestore";
+import { type Budget, deleteBudget, type Service } from "@/lib/firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface BudgetsPageProps {
   budgets: Budget[];
+  services: Service[]; // Pass services to be used as templates
   tenantId: string;
   refreshData: () => void;
   loading: boolean;
 }
 
 const statusMap: { [key: string]: { label: string, variant: "default" | "secondary" | "destructive" | "outline" } } = {
-    in_preparation: { label: "En Preparación", variant: "secondary" },
+    draft: { label: "Borrador", variant: "secondary" },
     sent: { label: "Enviado", variant: "outline" },
-    confirmed: { label: "Confirmado", variant: "default" },
+    approved: { label: "Confirmado", variant: "default" },
     rejected: { label: "Rechazado", variant: "destructive" },
 }
 
 
-export default function BudgetsPage({ budgets = [], tenantId, refreshData, loading }: BudgetsPageProps) {
+export default function BudgetsPage({ budgets = [], services = [], tenantId, refreshData, loading }: BudgetsPageProps) {
     const [open, setOpen] = useState(false);
     const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
@@ -68,6 +69,7 @@ export default function BudgetsPage({ budgets = [], tenantId, refreshData, loadi
                         <BudgetWizard 
                             tenantId={tenantId} 
                             initialBudget={editingBudget}
+                            serviceTemplates={services}
                             onSave={() => {
                                 setOpen(false);
                                 setEditingBudget(null);
@@ -88,7 +90,8 @@ export default function BudgetsPage({ budgets = [], tenantId, refreshData, loadi
                      <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Tipo de Evento</TableHead>
+                                <TableHead>Nombre / Evento</TableHead>
+                                <TableHead>Cliente</TableHead>
                                 <TableHead>Fecha</TableHead>
                                 <TableHead>Total (USD)</TableHead>
                                 <TableHead>Estado</TableHead>
@@ -98,9 +101,10 @@ export default function BudgetsPage({ budgets = [], tenantId, refreshData, loadi
                         <TableBody>
                             {budgets.map(budget => (
                                 <TableRow key={budget.id}>
-                                    <TableCell className="font-medium">{budget.eventType}</TableCell>
-                                    <TableCell>{new Date(budget.eventDate).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</TableCell>
-                                    <TableCell>${budget.totalUSD.toFixed(2)}</TableCell>
+                                    <TableCell className="font-medium">{budget.budgetName}</TableCell>
+                                    <TableCell>{budget.clientName}</TableCell>
+                                    <TableCell>{new Date(budget.eventInfo.date).toLocaleDateString('es-AR', { timeZone: 'UTC' })}</TableCell>
+                                    <TableCell>${budget.summary.totalUSD.toFixed(2)}</TableCell>
                                     <TableCell>
                                         <Badge variant={statusMap[budget.status]?.variant || "secondary"}>
                                             {statusMap[budget.status]?.label || "Desconocido"}

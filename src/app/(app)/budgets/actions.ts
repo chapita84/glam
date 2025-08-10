@@ -1,35 +1,52 @@
 
 'use server'
 
-import { addOrUpdateBooking, addOrUpdateBudget, type Budget } from '@/lib/firebase/firestore'
+import { addOrUpdateBooking, addOrUpdateBudget, type Budget, type EventInfo, type Summary } from '@/lib/firebase/firestore'
 import { z } from 'zod'
 import { generateBudget } from '@/ai/flows/generate-budget';
 import { revalidatePath } from 'next/cache';
 
-const budgetServicesSchema = z.array(z.object({
-  name: z.string(),
+const budgetServiceItemSchema = z.object({
+  description: z.string(),
+  category: z.string().optional().default('Servicio'),
   quantity: z.coerce.number(),
-  price: z.coerce.number(),
-  duration: z.coerce.number().optional().default(0),
-}));
+  unitCost: z.object({
+      amount: z.coerce.number(),
+      currency: z.string().default('USD')
+  }),
+  duration: z.coerce.number().optional().default(0), // duration per unit in minutes
+});
+
+export type BudgetServiceItem = z.infer<typeof budgetServiceItemSchema>;
 
 const budgetSchema = z.object({
   id: z.string().optional(),
+  clientName: z.string().min(1, "El nombre del cliente es requerido."),
+  status: z.enum(['draft', 'sent', 'approved', 'rejected']),
+  
+  // Event Info
   eventType: z.string().min(1, "El tipo de evento es requerido."),
   eventDate: z.string().min(1, "La fecha del evento es requerida."),
   eventTime: z.string().optional(),
   eventLocation: z.string().min(1, "La ubicación es requerida."),
-  services: z.string(), // JSON string
+  
+  // Items
+  items: z.string(), // JSON string of BudgetServiceItem[]
+
+  // Summary
   logisticsCost: z.coerce.number(),
   usdRate: z.coerce.number(),
-  status: z.enum(['in_preparation', 'sent', 'confirmed', 'rejected']),
   tenantId: z.string(),
 })
 
 export type BudgetItem = {
-  name: string;
+  description: string;
+  category?: string;
   quantity: number;
-  price: number;
+  unitCost: {
+    amount: number;
+    currency: string;
+  };
   duration?: number;
 }
 
@@ -44,10 +61,11 @@ export type AIGenerationFormState = {
 export type BudgetFormState = {
     message: string;
     errors?: {
+        clientName?: string[];
         eventType?: string[];
         eventDate?: string[];
         eventLocation?: string[];
-        services?: string[];
+        items?: string[];
     }
 }
 
@@ -70,9 +88,15 @@ export async function handleGenerateBudget(prevState: AIGenerationFormState, for
     const result = await generateBudget({
       eventTypeDescription: validatedFields.data.eventTypeDescription,
     });
-    // Add a default duration to AI suggested services
-    const servicesWithDuration = result.suggestedServices.map(s => ({...s, duration: 60 }));
-    return { message: 'success', data: servicesWithDuration };
+    // Adapt AI response to the new BudgetItem structure
+    const budgetItems: BudgetItem[] = result.suggestedServices.map(s => ({
+        description: s.name,
+        quantity: s.quantity,
+        unitCost: { amount: s.price, currency: 'USD' },
+        duration: 60, // Default duration
+        category: 'Sugerencia IA'
+    }));
+    return { message: 'success', data: budgetItems };
   } catch (error) {
     console.error(error);
     return { message: 'No se pudieron generar las sugerencias de presupuesto.' };
@@ -82,14 +106,15 @@ export async function handleGenerateBudget(prevState: AIGenerationFormState, for
 export async function handleSaveBudget(prevState: BudgetFormState, formData: FormData): Promise<BudgetFormState> {
     const validatedFields = budgetSchema.safeParse({
         id: formData.get('id'),
+        clientName: formData.get('clientName'),
+        status: formData.get('status'),
         eventType: formData.get('eventType'),
         eventDate: formData.get('eventDate'),
         eventTime: formData.get('eventTime'),
         eventLocation: formData.get('eventLocation'),
-        services: formData.get('services'),
+        items: formData.get('items'),
         logisticsCost: formData.get('logisticsCost'),
         usdRate: formData.get('usdRate'),
-        status: formData.get('status'),
         tenantId: formData.get('tenantId'),
     });
 
@@ -101,44 +126,62 @@ export async function handleSaveBudget(prevState: BudgetFormState, formData: For
     }
 
     try {
-        const services = budgetServicesSchema.parse(JSON.parse(validatedFields.data.services));
+        const items = z.array(budgetServiceItemSchema).parse(JSON.parse(validatedFields.data.items));
         
-        const servicesTotal = services.reduce((total, service) => total + (service.quantity * service.price), 0);
-        const totalDuration = services.reduce((total, service) => total + (service.duration || 0) * service.quantity, 0);
+        const servicesSubtotal = items.reduce((total, item) => total + (item.quantity * item.unitCost.amount), 0);
+        const totalDuration = items.reduce((total, item) => total + (item.duration || 0) * item.quantity, 0);
+
+        const eventInfo: EventInfo = {
+            type: validatedFields.data.eventType,
+            date: validatedFields.data.eventDate,
+            time: validatedFields.data.eventTime || "",
+            location: validatedFields.data.eventLocation,
+        };
+
+        const summary: Summary = {
+            subtotal: servicesSubtotal,
+            logistics: validatedFields.data.logisticsCost,
+            totalUSD: servicesSubtotal + validatedFields.data.logisticsCost,
+            exchangeRate: validatedFields.data.usdRate,
+            totalARS: (servicesSubtotal + validatedFields.data.logisticsCost) * validatedFields.data.usdRate,
+        };
 
         const budget: Budget = {
             id: validatedFields.data.id,
-            ...validatedFields.data,
-            services,
-            totalDuration,
-            totalUSD: servicesTotal + validatedFields.data.logisticsCost,
+            budgetName: `Presupuesto ${validatedFields.data.eventType} - ${validatedFields.data.clientName}`,
+            clientName: validatedFields.data.clientName,
+            status: validatedFields.data.status,
+            eventInfo,
+            items,
+            summary,
+            totalDuration, // Store for booking creation
         }
 
         const budgetId = await addOrUpdateBudget(validatedFields.data.tenantId, budget);
         
-        // If the budget is confirmed, create a booking
-        if (budget.status === 'confirmed' && budget.eventDate && budget.eventTime) {
-            const [hours, minutes] = budget.eventTime.split(':').map(Number);
-            const startTime = new Date(budget.eventDate);
+        // If the budget is approved, create a booking
+        if (budget.status === 'approved' && budget.eventInfo.date && budget.eventInfo.time) {
+            const [hours, minutes] = budget.eventInfo.time.split(':').map(Number);
+            const startTime = new Date(budget.eventInfo.date);
             startTime.setUTCHours(hours, minutes);
 
             await addOrUpdateBooking(validatedFields.data.tenantId, {
                 // The booking ID will be the same as the budget ID for easy reference
                 id: budgetId,
-                clientName: `Evento: ${budget.eventType}`,
+                clientName: `Evento: ${budget.eventInfo.type} (${budget.clientName})`,
                 clientId: 'event-client',
                 staffId: 'any-staff', // Or assign to a specific "Events" staff member
                 staffName: "Equipo de Eventos",
                 serviceId: 'event-service',
-                serviceName: `${budget.services.length} servicios`,
-                duration: budget.totalDuration,
+                serviceName: `${budget.items.length} servicios`,
+                duration: budget.totalDuration || 120, // Use calculated duration
                 startTime: startTime,
                 status: 'confirmed',
                 price: {
-                    amount: budget.totalUSD,
+                    amount: budget.summary.totalUSD,
                     currency: 'USD',
                 },
-                notes: `Presupuesto confirmado para ${budget.eventType} en ${budget.eventLocation}.`,
+                notes: `Presupuesto #${budgetId} aprobado para ${budget.eventInfo.type} en ${budget.eventInfo.location}.`,
             });
              revalidatePath('/(app)/appointments');
         }
@@ -149,7 +192,7 @@ export async function handleSaveBudget(prevState: BudgetFormState, formData: For
     } catch(error) {
         console.error(error);
         if (error instanceof z.ZodError) {
-             return { message: "Los datos de los servicios no son válidos.", errors: { services: error.flatten().fieldErrors._errors } };
+             return { message: "Los datos de los servicios no son válidos.", errors: { items: error.flatten().fieldErrors._errors } };
         }
         return { message: 'No se pudo guardar el presupuesto.' };
     }

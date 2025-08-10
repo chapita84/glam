@@ -11,10 +11,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2, Save, Send, CheckCircle, XCircle } from "lucide-react"
+import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2, Save, Send, CheckCircle, XCircle, Library, CirclePlus } from "lucide-react"
 import { BudgetDownloadButton } from "./budget-download-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { type Budget } from "@/lib/firebase/firestore"
+import { type Budget, type Service as ServiceTemplate } from "@/lib/firebase/firestore"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
+import { ScrollArea } from "./ui/scroll-area"
 
 const steps = [
   { id: 1, name: "Detalles del Evento", icon: PartyPopper },
@@ -24,26 +26,35 @@ const steps = [
 ]
 
 const statusOptions = [
-    { value: 'in_preparation', label: 'En Preparación', icon: Wand2 },
+    { value: 'draft', label: 'Borrador', icon: Wand2 },
     { value: 'sent', label: 'Enviado', icon: Send },
-    { value: 'confirmed', label: 'Confirmado', icon: CheckCircle },
+    { value: 'approved', label: 'Confirmado', icon: CheckCircle },
     { value: 'rejected', label: 'Rechazado', icon: XCircle },
 ]
 
-export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: string, initialBudget: Budget | null, onSave: () => void }) {
+interface BudgetWizardProps {
+    tenantId: string;
+    initialBudget: Budget | null;
+    serviceTemplates: ServiceTemplate[];
+    onSave: () => void;
+}
+
+export function BudgetWizard({ tenantId, initialBudget, serviceTemplates, onSave }: BudgetWizardProps) {
   const [currentStep, setCurrentStep] = useState(0)
+  const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
   
   // Initialize state from initialBudget or with default values
   const [eventDetails, setEventDetails] = useState({
-      eventType: initialBudget?.eventType || "",
-      eventDate: initialBudget?.eventDate ? new Date(initialBudget.eventDate).toISOString().split('T')[0] : "",
-      eventTime: initialBudget?.eventTime || "12:00",
-      eventLocation: initialBudget?.eventLocation || "",
+      clientName: initialBudget?.clientName || "",
+      eventType: initialBudget?.eventInfo.type || "",
+      eventDate: initialBudget?.eventInfo.date ? new Date(initialBudget.eventInfo.date).toISOString().split('T')[0] : "",
+      eventTime: initialBudget?.eventInfo.time || "12:00",
+      eventLocation: initialBudget?.eventInfo.location || "",
   })
-  const [services, setServices] = useState<BudgetItem[]>(initialBudget?.services || []);
-  const [logisticsCost, setLogisticsCost] = useState(initialBudget?.logisticsCost || 50);
-  const [usdRate, setUsdRate] = useState(initialBudget?.usdRate || 900);
-  const [status, setStatus] = useState<'in_preparation' | 'sent' | 'confirmed' | 'rejected'>(initialBudget?.status || 'in_preparation');
+  const [items, setItems] = useState<BudgetItem[]>(initialBudget?.items || []);
+  const [logisticsCost, setLogisticsCost] = useState(initialBudget?.summary?.logistics || 50);
+  const [usdRate, setUsdRate] = useState(initialBudget?.summary?.exchangeRate || 900);
+  const [status, setStatus] = useState<'draft' | 'sent' | 'approved' | 'rejected'>(initialBudget?.status || 'draft');
 
   const [aiState, aiFormAction] = useActionState(handleGenerateBudget, { message: "" });
   const [budgetState, budgetFormAction] = useActionState(handleSaveBudget, { message: "" });
@@ -51,7 +62,7 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
 
   useEffect(() => {
     if (aiState.message === 'success' && aiState.data) {
-        setServices(aiState.data);
+        setItems(aiState.data);
     }
   }, [aiState]);
 
@@ -79,29 +90,47 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
       setEventDetails({...eventDetails, [e.target.id]: e.target.value });
   }
 
-  const handleServiceChange = (index: number, field: keyof BudgetItem, value: string | number) => {
-      const newServices = [...services];
-      const parsedValue = typeof value === 'string' && (field === 'quantity' || field === 'price' || field === 'duration') ? parseFloat(value) : value;
-      (newServices[index] as any)[field] = parsedValue;
-      setServices(newServices);
+  const handleItemChange = (index: number, field: keyof BudgetItem, value: string | number) => {
+      const newItems = [...items];
+      if (field === 'unitCost') {
+          newItems[index].unitCost.amount = Number(value);
+      } else {
+        const parsedValue = typeof value === 'string' && (field === 'quantity' || field === 'duration') ? parseFloat(value) : value;
+        (newItems[index] as any)[field] = parsedValue;
+      }
+      setItems(newItems);
   };
 
-  const addService = () => {
-      setServices([...services, { name: 'Nuevo Servicio', quantity: 1, price: 0, duration: 30 }]);
+  const addItem = (item: BudgetItem) => {
+      setItems([...items, item]);
   };
 
-  const removeService = (index: number) => {
-      setServices(services.filter((_, i) => i !== index));
+  const addServiceFromTemplate = (template: ServiceTemplate) => {
+    addItem({
+        description: template.name,
+        category: template.category,
+        quantity: 1,
+        unitCost: { amount: template.price, currency: 'USD' },
+        duration: template.duration
+    });
+    setTemplateModalOpen(false);
+  }
+
+  const removeItem = (index: number) => {
+      setItems(items.filter((_, i) => i !== index));
   };
   
-  const servicesTotal = services.reduce((total, service) => total + ((service.quantity || 0) * (service.price || 0)), 0);
-  const totalUSD = servicesTotal + (logisticsCost || 0);
+  const servicesSubtotal = items.reduce((total, item) => total + ((item.quantity || 0) * (item.unitCost.amount || 0)), 0);
+  const totalUSD = servicesSubtotal + (logisticsCost || 0);
   const totalARS = totalUSD * (usdRate || 0);
 
-  const budgetData = {
-    ...eventDetails,
-    services,
-    servicesTotal,
+  const budgetPDFData = {
+    eventType: eventDetails.eventType,
+    eventDate: eventDetails.eventDate,
+    eventLocation: eventDetails.eventLocation,
+    // Adapt for PDF component
+    services: items.map(i => ({ name: i.description, quantity: i.quantity, price: i.unitCost.amount })),
+    servicesTotal: servicesSubtotal,
     logisticsCost,
     totalUSD,
     totalARS,
@@ -109,7 +138,7 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
   }
 
   const pdfFileName = eventDetails.eventType 
-    ? `Presupuesto-${eventDetails.eventType.replace(/\s+/g, '-')}.pdf`
+    ? `Presupuesto-${eventDetails.eventType.replace(/\s+/g, '-')}-${eventDetails.clientName.replace(/\s+/g, '-')}.pdf`
     : "Presupuesto.pdf";
 
   const AIGenerateButton = () => {
@@ -143,6 +172,10 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
       <div className="space-y-6">
         {currentStep === 0 && (
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="clientName">Nombre del Cliente</Label>
+              <Input id="clientName" placeholder="p. ej., Lucía Gómez" value={eventDetails.clientName} onChange={handleEventDetailsChange} />
+            </div>
             <div>
               <Label htmlFor="eventType">Tipo de Evento</Label>
               <Input id="eventType" placeholder="p. ej., Boda, Gala Corporativa" value={eventDetails.eventType} onChange={handleEventDetailsChange} />
@@ -198,23 +231,23 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {services.map((service, index) => (
+                        {items.map((item, index) => (
                             <TableRow key={index}>
                                 <TableCell>
-                                    <Input value={service.name} onChange={e => handleServiceChange(index, 'name', e.target.value)} />
+                                    <Input value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} />
                                 </TableCell>
                                 <TableCell>
-                                    <Input type="number" value={service.quantity} onChange={e => handleServiceChange(index, 'quantity', e.target.value)} />
+                                    <Input type="number" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} />
                                 </TableCell>
                                  <TableCell>
-                                    <Input type="number" value={service.duration} onChange={e => handleServiceChange(index, 'duration', e.target.value)} />
+                                    <Input type="number" value={item.duration} onChange={e => handleItemChange(index, 'duration', e.target.value)} />
                                 </TableCell>
                                 <TableCell>
-                                    <Input type="number" step="0.01" value={service.price} onChange={e => handleServiceChange(index, 'price', e.target.value)} />
+                                    <Input type="number" step="0.01" value={item.unitCost.amount} onChange={e => handleItemChange(index, 'unitCost', e.target.value)} />
                                 </TableCell>
-                                <TableCell>${((service.quantity || 0) * (service.price || 0)).toFixed(2)}</TableCell>
+                                <TableCell>${((item.quantity || 0) * (item.unitCost.amount || 0)).toFixed(2)}</TableCell>
                                 <TableCell>
-                                    <Button variant="ghost" size="icon" onClick={() => removeService(index)}>
+                                    <Button variant="ghost" size="icon" onClick={() => removeItem(index)}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </TableCell>
@@ -222,10 +255,41 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
                         ))}
                     </TableBody>
                 </Table>
-                <Button variant="outline" onClick={addService}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Añadir Servicio Manualmente
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => addItem({ description: 'Nuevo Servicio', quantity: 1, unitCost: { amount: 0, currency: 'USD' }, duration: 30 })}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Añadir Manualmente
+                    </Button>
+                     <Dialog open={isTemplateModalOpen} onOpenChange={setTemplateModalOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline">
+                                <Library className="mr-2 h-4 w-4" />
+                                Añadir desde Plantilla
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Seleccionar Servicio desde Plantilla</DialogTitle>
+                                <DialogDescription>Elige un servicio pre-configurado para añadirlo al presupuesto.</DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="max-h-96">
+                            <div className="p-4 space-y-2">
+                               {serviceTemplates.map(template => (
+                                   <div key={template.id} className="flex items-center justify-between p-2 border rounded-lg">
+                                       <div>
+                                           <p className="font-semibold">{template.name}</p>
+                                           <p className="text-sm text-muted-foreground">${template.price.toFixed(2)} - {template.duration} min</p>
+                                       </div>
+                                       <Button size="icon" variant="ghost" onClick={() => addServiceFromTemplate(template)}>
+                                            <CirclePlus className="h-5 w-5" />
+                                       </Button>
+                                   </div>
+                               ))}
+                            </div>
+                            </ScrollArea>
+                        </DialogContent>
+                    </Dialog>
+                </div>
              </div>
           </div>
         )}
@@ -275,6 +339,10 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
                 </Alert>
                 <div className="p-6 border rounded-lg space-y-4">
                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cliente:</span>
+                        <span className="font-medium">{eventDetails.clientName}</span>
+                    </div>
+                    <div className="flex justify-between">
                         <span className="text-muted-foreground">Tipo de Evento:</span>
                         <span className="font-medium">{eventDetails.eventType}</span>
                     </div>
@@ -283,16 +351,16 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
                         <span className="font-medium">{eventDetails.eventLocation}</span>
                     </div>
                     <div className="border-t pt-4 mt-4">
-                         {services.map((service, index) => (
+                         {items.map((item, index) => (
                             <div key={index} className="flex justify-between">
-                                <span>{service.name} x{service.quantity}</span>
-                                <span>${((service.quantity || 0) * (service.price || 0)).toFixed(2)}</span>
+                                <span>{item.description} x{item.quantity}</span>
+                                <span>${((item.quantity || 0) * (item.unitCost.amount || 0)).toFixed(2)}</span>
                             </div>
                         ))}
                     </div>
                      <div className="flex justify-between border-t pt-2 mt-2">
                         <span className="text-muted-foreground">Subtotal Servicios:</span>
-                        <span className="font-medium">${servicesTotal.toFixed(2)}</span>
+                        <span className="font-medium">${servicesSubtotal.toFixed(2)}</span>
                     </div>
                      <div className="flex justify-between">
                         <span className="text-muted-foreground">Logística:</span>
@@ -308,15 +376,16 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
                     </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
-                    <BudgetDownloadButton data={budgetData} fileName={pdfFileName} />
+                    <BudgetDownloadButton data={budgetPDFData} fileName={pdfFileName} />
                      <form action={budgetFormAction}>
                         <input type="hidden" name="id" value={initialBudget?.id} />
                         <input type="hidden" name="tenantId" value={tenantId} />
+                        <input type="hidden" name="clientName" value={eventDetails.clientName} />
                         <input type="hidden" name="eventType" value={eventDetails.eventType} />
                         <input type="hidden" name="eventDate" value={eventDetails.eventDate} />
                         <input type="hidden" name="eventTime" value={eventDetails.eventTime} />
                         <input type="hidden" name="eventLocation" value={eventDetails.eventLocation} />
-                        <input type="hidden" name="services" value={JSON.stringify(services)} />
+                        <input type="hidden" name="items" value={JSON.stringify(items)} />
                         <input type="hidden" name="logisticsCost" value={logisticsCost} />
                         <input type="hidden" name="usdRate" value={usdRate} />
                         <input type="hidden" name="status" value={status} />
@@ -331,7 +400,7 @@ export function BudgetWizard({ tenantId, initialBudget, onSave }: { tenantId: st
                       <AlertTitle>Error al Guardar</AlertTitle>
                       <AlertDescription>
                         {budgetState.message}
-                        {budgetState.errors?.services && <div>- {budgetState.errors.services[0]}</div>}
+                        {budgetState.errors?.items && <div>- {budgetState.errors.items[0]}</div>}
                       </AlertDescription>
                     </Alert>
                 )}

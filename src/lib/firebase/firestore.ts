@@ -1,9 +1,10 @@
 
 
+
 import { db } from './config';
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import type { Role } from '@/app/(app)/layout';
-import type { BudgetItem } from '@/app/(app)/budgets/actions';
+import type { BudgetItem as AIBudgetItem } from '@/app/(app)/budgets/actions';
 
 
 // Type for role data stored in Firestore
@@ -57,21 +58,50 @@ export type Booking = {
     notes?: string;
 }
 
+// =================================================================
+// Budget Module Types (New Specification)
+// =================================================================
+
+export type EventInfo = {
+    type: string;
+    date: string; // ISO string date
+    time: string; // "HH:mm"
+    location: string;
+};
+
+export type BudgetItem = {
+    description: string;
+    category: string;
+    quantity: number;
+    unitCost: {
+        amount: number;
+        currency: 'USD' | 'ARS';
+    };
+    duration?: number; // duration per unit in minutes
+};
+
+export type Summary = {
+    subtotal: number;
+    logistics: number;
+    totalUSD: number;
+    exchangeRate: number;
+    totalARS: number;
+};
+
 export type Budget = {
     id?: string;
-    eventType: string;
-    eventDate: string;
-    eventTime: string;
-    eventLocation: string;
-    services: BudgetItem[];
-    logisticsCost: number;
-    usdRate: number;
-    totalUSD: number;
-    totalDuration: number;
-    status: 'in_preparation' | 'sent' | 'confirmed' | 'rejected';
+    budgetName: string;
+    clientName: string;
+    status: 'draft' | 'sent' | 'approved' | 'rejected';
     createdAt?: any;
     updatedAt?: any;
+    eventInfo: EventInfo;
+    items: BudgetItem[];
+    summary: Summary;
+    totalDuration?: number; // Calculated field, useful for booking
 }
+
+// =================================================================
 
 
 export type WorkingHour = {
@@ -385,7 +415,7 @@ export async function getBudgets(tenantId: string): Promise<Budget[]> {
  * Adds or updates a budget in Firestore.
  * @returns The ID of the saved budget.
  */
-export async function addOrUpdateBudget(tenantId: string, budget: Budget): Promise<string> {
+export async function addOrUpdateBudget(tenantId: string, budget: Omit<Budget, 'createdAt'|'updatedAt'> & {id?: string}): Promise<string> {
     const budgetDocRef = budget.id
         ? doc(db, 'tenants', tenantId, 'budgets', budget.id)
         : doc(collection(db, 'tenants', tenantId, 'budgets'));
@@ -395,12 +425,16 @@ export async function addOrUpdateBudget(tenantId: string, budget: Budget): Promi
         id: budgetDocRef.id,
         updatedAt: serverTimestamp(),
     };
+
+    // Set createdAt only if it's a new document
+    const finalData: any = { ...budgetData };
     if (!budget.id) {
-        budgetData.createdAt = serverTimestamp();
+        finalData.createdAt = serverTimestamp();
     }
 
+
     try {
-        await setDoc(budgetDocRef, budgetData, { merge: true });
+        await setDoc(budgetDocRef, finalData, { merge: true });
         console.log("Budget saved successfully: ", budgetDocRef.id);
         return budgetDocRef.id;
     } catch (error) {
