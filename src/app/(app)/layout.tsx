@@ -38,6 +38,7 @@ import {
   Settings,
 } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Panel" },
@@ -76,6 +77,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [config, setConfig] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
 
   // Using a mock tenantId for now.
   const tenantId = "test-tenant";
@@ -118,6 +120,8 @@ export default function AppLayout({ children }: PropsWithChildren) {
     }
     return child;
   });
+
+  const mainContentPadding = pathname === '/appointments' ? 'p-0' : 'p-4 sm:px-6 sm:py-6';
   
   return (
     <SidebarProvider>
@@ -134,7 +138,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
           <SidebarMenu>
             {navItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild tooltip={item.label}>
+                    <SidebarMenuButton asChild tooltip={item.label} isActive={pathname.startsWith(item.href)}>
                         <Link href={item.href}>
                             <item.icon />
                             <span>{item.label}</span>
@@ -195,7 +199,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex-1 p-4 sm:px-6 sm:py-6">{loading ? <p>Cargando datos...</p> : childrenWithProps}</main>
+        <main className={`flex-1 ${mainContentPadding}`}>{loading ? <p>Cargando datos...</p> : childrenWithProps}</main>
       </SidebarInset>
     </SidebarProvider>
   );

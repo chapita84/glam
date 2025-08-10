@@ -3,15 +3,13 @@
 
 import React, { useState, useMemo } from "react"
 import { Calendar } from "@/components/ui/calendar"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "./ui/button"
 import { Label } from "./ui/label"
 import { Input } from "./ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { PlusCircle } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { format, isSameDay, setHours, setMinutes, getDay, parse, addMinutes, startOfDay, endOfDay, eachHourOfInterval } from "date-fns"
+import { PlusCircle, ChevronLeft, ChevronRight } from "lucide-react"
+import { format, isSameDay, setHours, setMinutes, getDay, parse, addMinutes, startOfDay, endOfDay, eachHourOfInterval, startOfWeek, endOfWeek, eachDayOfInterval, addDays, subDays } from "date-fns"
 import { es } from "date-fns/locale"
 import { type Booking, type StaffMember, type Service, addOrUpdateBooking, type TenantConfig } from "@/lib/firebase/firestore"
 import { ScrollArea } from "./ui/scroll-area"
@@ -25,28 +23,35 @@ type AppointmentsCalendarProps = {
     onBookingCreated: () => void;
 }
 
+const eventColors = [
+    'bg-red-500/20 border-red-500/80 text-red-300',
+    'bg-blue-500/20 border-blue-500/80 text-blue-300',
+    'bg-green-500/20 border-green-500/80 text-green-300',
+    'bg-purple-500/20 border-purple-500/80 text-purple-300',
+    'bg-yellow-500/20 border-yellow-500/80 text-yellow-300',
+];
+
 export function AppointmentsCalendar({ bookings, staff, services, config, tenantId, onBookingCreated }: AppointmentsCalendarProps) {
-  const [date, setDate] = useState<Date | undefined>(new Date())
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [open, setOpen] = useState(false);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  const todaysAppointments = useMemo(() => {
-    return date
-        ? bookings
-            .filter(booking => isSameDay(booking.startTime, date))
-            .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-        : [];
-    }, [date, bookings]);
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(currentDate, { locale: es });
+    const end = endOfWeek(currentDate, { locale: es });
+    return eachDayOfInterval({ start, end });
+  }, [currentDate]);
 
   const handleSaveBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
 
-    const selectedDate = date || new Date();
+    const bookingDate = selectedDate || new Date();
     const time = formData.get('time') as string;
     const [hours, minutes] = time.split(':').map(Number);
-    const startTime = setMinutes(setHours(selectedDate, hours), minutes);
+    const startTime = setMinutes(setHours(bookingDate, hours), minutes);
 
     const serviceId = formData.get('serviceId') as string;
     const selectedService = services.find(s => s.id === serviceId);
@@ -80,10 +85,12 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
     
     setOpen(false);
     setSelectedTime(null);
+    setSelectedDate(null);
     onBookingCreated();
   };
 
-  const handleOpenDialog = (time: string | null = null) => {
+  const handleOpenDialog = (date: Date, time: string | null = null) => {
+    setSelectedDate(date);
     setSelectedTime(time);
     setOpen(true);
   }
@@ -97,6 +104,7 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
           setOpen(isOpen);
           if (!isOpen) {
               setSelectedTime(null);
+              setSelectedDate(null);
           }
       }}>
         <DialogContent className="sm:max-w-md">
@@ -157,112 +165,111 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
     )
   }
 
-  const DailyScheduleView = () => {
-    const dayOfWeek = date ? getDay(date) : -1;
+  const DayColumn = ({ day }: { day: Date }) => {
+    const dayOfWeek = getDay(day);
     const workingDay = config?.workingHours?.find(d => d.dayOfWeek === dayOfWeek && d.enabled);
+    const dayStart = workingDay ? parse(workingDay.startTime, 'HH:mm', day) : startOfDay(day);
+    const dayEnd = workingDay ? parse(workingDay.endTime, 'HH:mm', day) : endOfDay(day);
 
-    if (!date || !workingDay) {
-      return (
-        <div className="h-[600px] flex items-center justify-center text-muted-foreground">
-          <p>El estudio está cerrado este día.</p>
-        </div>
-      );
-    }
-    
-    const dayStart = parse(workingDay.startTime, 'HH:mm', date);
-    const dayEnd = parse(workingDay.endTime, 'HH:mm', date);
     const hours = eachHourOfInterval({ start: dayStart, end: dayEnd });
-    
     const totalMinutes = (dayEnd.getTime() - dayStart.getTime()) / 60000;
 
-    return (
-      <div className="relative">
-        {hours.map((hour, index) => (
-          <div key={index} className="relative flex h-24 border-t border-muted/50">
-            <div className="w-16 text-xs text-right pr-2 pt-1 text-muted-foreground">
-              {format(hour, 'p', { locale: es })}
-            </div>
-            <div className="flex-1 border-l border-muted/50" />
-          </div>
-        ))}
+    const appointmentsForDay = bookings.filter(b => isSameDay(b.startTime, day));
 
-        {todaysAppointments.map(app => {
-          const top = (app.startTime.getTime() - dayStart.getTime()) / 60000 / totalMinutes * 100;
-          const height = app.duration / totalMinutes * 100;
-          
-          return (
-            <div 
-              key={app.id} 
-              className="absolute left-16 right-0 p-2 rounded-lg bg-primary/20 border border-primary/50 text-primary-foreground"
-              style={{ top: `${top}%`, height: `${height}%` }}
-            >
-              <p className="font-semibold text-xs text-primary">{app.serviceName}</p>
-              <p className="text-xs text-primary/80">{app.clientName}</p>
-              <p className="text-xs text-primary/60">con {app.staffName}</p>
-            </div>
-          );
-        })}
+    return (
+      <div className="flex-1 border-r last:border-r-0">
+        <div className="text-center py-2 border-b">
+          <p className="text-xs uppercase text-muted-foreground">{format(day, "eee", { locale: es })}</p>
+          <p className={`text-2xl font-bold mt-1 ${isSameDay(day, new Date()) ? 'text-primary' : ''}`}>{format(day, "d")}</p>
+        </div>
+        <div className="relative h-[calc(100vh-170px)]">
+          {hours.map((hour, index) => (
+            <div
+              key={index}
+              className="relative h-24 border-t"
+              onClick={() => handleOpenDialog(day, format(hour, "HH:mm"))}
+            />
+          ))}
+          {appointmentsForDay.map((app, index) => {
+            const top = (app.startTime.getTime() - dayStart.getTime()) / 60000 / totalMinutes * 100;
+            const height = app.duration / totalMinutes * 100;
+            const colorClass = eventColors[index % eventColors.length];
+            return (
+              <div 
+                key={app.id} 
+                className={`absolute left-2 right-2 p-2 rounded-lg border ${colorClass}`}
+                style={{ top: `${top}%`, height: `${height}%` }}
+              >
+                <p className="font-semibold text-xs">{app.serviceName}</p>
+                <p className="text-xs opacity-80">{app.clientName}</p>
+                <p className="text-xs opacity-60">con {app.staffName}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[1fr,2fr]">
-        <div className="lg:order-2">
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        <span>Agenda - {date ? format(date, "PPP", { locale: es }) : "Selecciona una fecha"}</span>
-                         <Button variant="ghost" size="icon" onClick={() => handleOpenDialog()}>
-                            <PlusCircle className="h-5 w-5"/>
+    <div className="flex h-full w-full">
+        <aside className="w-64 border-r p-4 space-y-4">
+             <div className="flex items-center gap-4">
+                <PlusCircle className="w-8 h-8"/>
+                <h2 className="text-2xl font-bold">Calendario</h2>
+            </div>
+            <Button onClick={() => setOpen(true)} className="w-full">
+                <PlusCircle className="mr-2"/>
+                Crear
+            </Button>
+            <Calendar
+                locale={es}
+                mode="single"
+                selected={currentDate}
+                onSelect={(date) => date && setCurrentDate(date)}
+                className="rounded-md"
+                classNames={{
+                    day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90",
+                    day_today: "bg-accent text-accent-foreground",
+                }}
+            />
+        </aside>
+        <main className="flex-1 flex flex-col">
+            <header className="flex items-center justify-between p-4 border-b">
+                <div className="flex items-center gap-4">
+                    <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Hoy</Button>
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => setCurrentDate(prev => subDays(prev, 7))}>
+                            <ChevronLeft />
                         </Button>
-                    </CardTitle>
-                    <CardDescription>Citas programadas para el día seleccionado.</CardDescription>
-                </CardHeader>
-                <ScrollArea className="h-[600px]">
-                  <CardContent className="p-4">
-                    <DailyScheduleView />
-                  </CardContent>
+                        <Button variant="ghost" size="icon" onClick={() => setCurrentDate(prev => addDays(prev, 7))}>
+                            <ChevronRight />
+                        </Button>
+                    </div>
+                     <h2 className="text-xl font-semibold">{format(currentDate, "MMMM yyyy", { locale: es })}</h2>
+                </div>
+                <div>
+                    {/* Placeholder for view selector, etc. */}
+                </div>
+            </header>
+            <div className="flex flex-1 overflow-hidden">
+                <div className="w-16 text-xs text-center text-muted-foreground pt-[72px]">
+                    {eachHourOfInterval({ start: setHours(new Date(), 7), end: setHours(new Date(), 18) }).map(hour => (
+                        <div key={hour.toISOString()} className="h-24 flex items-start justify-center pt-1">
+                            <span>{format(hour, "p", { locale: es })}</span>
+                        </div>
+                    ))}
+                </div>
+                <ScrollArea className="flex-1">
+                    <div className="flex">
+                        {weekDays.map(day => (
+                            <DayColumn key={day.toISOString()} day={day} />
+                        ))}
+                    </div>
                 </ScrollArea>
-            </Card>
-            {open && <NewBookingForm />}
-        </div>
-        <div className="lg:order-1">
-            <Card>
-                <CardContent className="p-0">
-                    <Calendar
-                        locale={es}
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        className="rounded-md"
-                        classNames={{
-                            day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90",
-                            day_today: "bg-accent text-accent-foreground",
-                        }}
-                        modifiers={{
-                            booked: bookings.map(b => b.startTime)
-                        }}
-                        modifiersClassNames={{
-                            booked: 'relative'
-                        }}
-                        components={{
-                            DayContent: (props) => {
-                                const isBooked = bookings.some(b => isSameDay(b.startTime, props.date));
-                                return (
-                                    <div className="relative w-full h-full flex items-center justify-center">
-                                        {props.date.getDate()}
-                                        {isBooked && <div className="absolute bottom-1 w-1.5 h-1.5 bg-primary rounded-full"></div>}
-                                    </div>
-                                )
-                            }
-                        }}
-                    />
-                </CardContent>
-            </Card>
-        </div>
+            </div>
+        </main>
+        {open && <NewBookingForm />}
     </div>
   )
 }
-
-    
