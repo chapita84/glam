@@ -3,7 +3,7 @@
 
 import type { PropsWithChildren } from 'react';
 import React, { useState, useEffect } from 'react';
-import { getRoles } from '@/lib/firebase/firestore';
+import { getRoles, getStaff, type StaffMember } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -98,29 +98,38 @@ const allPermissions: Permission[] = [
 
 export default function AppLayout({ children }: PropsWithChildren) {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchRoles() {
-      const tenantId = "test-tenant"; // Using a mock tenantId for now
-      const fetchedRoles = await getRoles(tenantId);
-      setRoles(fetchedRoles);
-      setLoading(false);
-    }
-    fetchRoles();
-  }, []);
+  // Using a mock tenantId for now
+  const tenantId = "test-tenant";
 
-  // Callback to refresh roles from Firestore
-  const refreshRoles = async () => {
-    const tenantId = "test-tenant";
-    const fetchedRoles = await getRoles(tenantId);
+  const refreshData = async () => {
+    setLoading(true);
+    const [fetchedRoles, fetchedStaff] = await Promise.all([
+      getRoles(tenantId),
+      getStaff(tenantId)
+    ]);
     setRoles(fetchedRoles);
+    setStaff(fetchedStaff);
+    setLoading(false);
   };
+  
+  useEffect(() => {
+    refreshData();
+  }, []);
   
   const childrenWithProps = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
       // @ts-ignore - cloning child to pass props
-      return React.cloneElement(child, { roles, allPermissions, refreshRoles, loading });
+      return React.cloneElement(child, { 
+          roles, 
+          staff,
+          allPermissions, 
+          refreshData, 
+          loading,
+          tenantId 
+      });
     }
     return child;
   });

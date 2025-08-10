@@ -3,6 +3,7 @@
 
 import React, { useState } from "react"
 import type { Role } from "../layout"
+import { addOrUpdateStaffMember, deleteStaffMember, type StaffMember } from "@/lib/firebase/firestore";
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,27 +43,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MoreHorizontal, PlusCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-type StaffMember = {
-  name: string;
-  email: string;
-  roleId: string;
-  avatar: string;
-};
-
-const initialStaffMembers: StaffMember[] = [
-  { name: "Jessica Miller", email: "jessica@glamdash.com", roleId: "estilista_principal", avatar: "JM" },
-  { name: "Monica Evans", email: "monica@glamdash.com", roleId: "estilista", avatar: "ME" },
-  { name: "Sophie Chen", email: "sophie@glamdash.com", roleId: "artista_de_unas", avatar: "SC" },
-  { name: "Usuario Admin", email: "admin@glamdash.com", roleId: "propietario", avatar: "AU" },
-]
-
 interface StaffPageProps {
   roles: Role[];
+  staff: StaffMember[];
+  refreshData: () => void;
   loading: boolean;
+  tenantId: string;
 }
 
-export default function StaffPage({ roles = [], loading }: StaffPageProps) {
-  const [staffMembers, setStaffMembers] = useState<StaffMember[]>(initialStaffMembers)
+export default function StaffPage({ roles = [], staff = [], refreshData, loading, tenantId }: StaffPageProps) {
   const [open, setOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
 
@@ -71,36 +60,31 @@ export default function StaffPage({ roles = [], loading }: StaffPageProps) {
     setOpen(true);
   };
   
-  const handleSaveMember = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveMember = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
-    // For Select, value is handled differently. We need to get it from the form data.
     const formData = new FormData(form);
+    const email = formData.get('email') as string;
     const roleId = formData.get('roleId') as string;
 
     if (email && roleId) {
-      if (editingMember) {
-        // Update existing member
-        setStaffMembers(
-          staffMembers.map((m) =>
-            m.email === editingMember.email ? { ...m, email, roleId } : m
-          )
-        );
-      } else {
-        // Add new member (invitation)
-        // Here we would call the serverless function. For now, we simulate it locally.
-        const name = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const avatar = name.split(' ').map(n => n[0]).join('');
-        setStaffMembers([...staffMembers, { name, email, roleId, avatar }]);
-      }
-      setOpen(false);
-      setEditingMember(null);
+        // In a real app, userId would come from Firebase Auth after user creation/lookup
+        const memberId = editingMember?.id || email; 
+        const name = editingMember?.name || email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+        await addOrUpdateStaffMember(tenantId, { id: memberId, name, email, roleId });
+        await refreshData();
+        
+        setOpen(false);
+        setEditingMember(null);
     }
   };
 
-  const handleDelete = (email: string) => {
-    setStaffMembers(staffMembers.filter(member => member.email !== email))
+  const handleDelete = async (userId: string) => {
+      if (confirm('¿Estás seguro de que quieres eliminar a este miembro del equipo?')) {
+          await deleteStaffMember(tenantId, userId);
+          await refreshData();
+      }
   }
   
   const getRoleName = (roleId: string) => {
@@ -133,14 +117,14 @@ export default function StaffPage({ roles = [], loading }: StaffPageProps) {
                             <DialogTitle>{editingMember ? 'Editar Miembro' : 'Invitar Nuevo Miembro'}</DialogTitle>
                             <DialogDescription>
                                 {editingMember 
-                                    ? 'Actualiza el correo electrónico y el rol de este miembro del equipo.'
+                                    ? 'Actualiza el rol de este miembro del equipo.'
                                     : 'Introduce el correo electrónico y asigna un rol a la persona que quieres invitar.'}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="email" className="text-right">Correo Electrónico</Label>
-                                <Input id="email" name="email" type="email" defaultValue={editingMember?.email} placeholder="staff@example.com" className="col-span-3" required/>
+                                <Input id="email" name="email" type="email" defaultValue={editingMember?.email} placeholder="staff@example.com" className="col-span-3" required disabled={!!editingMember}/>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="roleId" className="text-right">Rol</Label>
@@ -180,40 +164,43 @@ export default function StaffPage({ roles = [], loading }: StaffPageProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {staffMembers.map((staff) => (
-                <TableRow key={staff.email}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={`https://placehold.co/40x40.png?text=${staff.avatar}`} data-ai-hint="foto de perfil"/>
-                        <AvatarFallback>{staff.avatar}</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">
-                        <div>{staff.name}</div>
-                        <div className="text-sm text-muted-foreground">{staff.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getRoleName(staff.roleId) === "Propietario" ? "default" : "secondary"}>{getRoleName(staff.roleId)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost" disabled={getRoleName(staff.roleId) === 'Propietario'}>
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Menú</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(staff)}>Editar Rol</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(staff.email)}>Eliminar del Equipo</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {staff.map((member) => {
+                  const avatarFallback = member.name.split(' ').map(n => n[0]).join('');
+                  return (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={`https://placehold.co/40x40.png?text=${avatarFallback}`} data-ai-hint="foto de perfil"/>
+                            <AvatarFallback>{avatarFallback}</AvatarFallback>
+                          </Avatar>
+                          <div className="font-medium">
+                            <div>{member.name}</div>
+                            <div className="text-sm text-muted-foreground">{member.email}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getRoleName(member.roleId) === "Propietario" ? "default" : "secondary"}>{getRoleName(member.roleId)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost" disabled={getRoleName(member.roleId) === 'Propietario'}>
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Menú</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleOpenDialog(member)}>Editar Rol</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(member.id)}>Eliminar del Equipo</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
             </TableBody>
           </Table>
         </CardContent>
