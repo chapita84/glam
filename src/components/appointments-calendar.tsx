@@ -168,8 +168,10 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
   const DayColumn = ({ day }: { day: Date }) => {
     const dayOfWeek = getDay(day);
     const workingDay = config?.workingHours?.find(d => d.dayOfWeek === dayOfWeek && d.enabled);
-    const dayStart = workingDay ? parse(workingDay.startTime, 'HH:mm', day) : startOfDay(day);
-    const dayEnd = workingDay ? parse(workingDay.endTime, 'HH:mm', day) : endOfDay(day);
+    
+    // Fallback to a default 9-5 if not configured
+    const dayStart = workingDay ? parse(workingDay.startTime, 'HH:mm', day) : setHours(startOfDay(day), 9);
+    const dayEnd = workingDay ? parse(workingDay.endTime, 'HH:mm', day) : setHours(startOfDay(day), 17);
 
     const hours = eachHourOfInterval({ start: dayStart, end: dayEnd });
     const totalMinutes = (dayEnd.getTime() - dayStart.getTime()) / 60000;
@@ -177,22 +179,25 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
     const appointmentsForDay = bookings.filter(b => isSameDay(b.startTime, day));
 
     return (
-      <div className="flex-1 border-r last:border-r-0">
-        <div className="text-center py-2 border-b">
+      <div className="flex-1 border-r last:border-r-0 dark:border-slate-700">
+        <div className="text-center py-2 border-b dark:border-slate-700">
           <p className="text-xs uppercase text-muted-foreground">{format(day, "eee", { locale: es })}</p>
           <p className={`text-2xl font-bold mt-1 ${isSameDay(day, new Date()) ? 'text-primary' : ''}`}>{format(day, "d")}</p>
         </div>
-        <div className="relative h-[calc(100vh-170px)]">
+        <div className="relative h-[calc(100vh-240px)]">
           {hours.map((hour, index) => (
             <div
               key={index}
-              className="relative h-24 border-t"
+              className="relative h-24 border-t dark:border-slate-800"
               onClick={() => handleOpenDialog(day, format(hour, "HH:mm"))}
             />
           ))}
           {appointmentsForDay.map((app, index) => {
-            const top = (app.startTime.getTime() - dayStart.getTime()) / 60000 / totalMinutes * 100;
-            const height = app.duration / totalMinutes * 100;
+            const topPercent = (app.startTime.getTime() - dayStart.getTime()) / (1000 * 60);
+            const heightPercent = app.duration;
+            const top = (topPercent / totalMinutes) * 100;
+            const height = (heightPercent / totalMinutes) * 100;
+
             const colorClass = eventColors[index % eventColors.length];
             return (
               <div 
@@ -212,15 +217,14 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
   };
 
   return (
-    <div className="flex h-full w-full">
-        <aside className="w-64 border-r p-4 space-y-4">
+    <div className="flex h-full w-full bg-card rounded-xl border">
+        <aside className="w-72 border-r p-4 space-y-4 dark:border-slate-700">
              <div className="flex items-center gap-4">
-                <PlusCircle className="w-8 h-8"/>
-                <h2 className="text-2xl font-bold">Calendario</h2>
+                <h2 className="text-xl font-bold">Calendario de Citas</h2>
             </div>
             <Button onClick={() => setOpen(true)} className="w-full">
                 <PlusCircle className="mr-2"/>
-                Crear
+                Crear Cita
             </Button>
             <Calendar
                 locale={es}
@@ -235,7 +239,7 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
             />
         </aside>
         <main className="flex-1 flex flex-col">
-            <header className="flex items-center justify-between p-4 border-b">
+            <header className="flex items-center justify-between p-4 border-b dark:border-slate-700">
                 <div className="flex items-center gap-4">
                     <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Hoy</Button>
                     <div className="flex items-center gap-2">
@@ -246,17 +250,14 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
                             <ChevronRight />
                         </Button>
                     </div>
-                     <h2 className="text-xl font-semibold">{format(currentDate, "MMMM yyyy", { locale: es })}</h2>
-                </div>
-                <div>
-                    {/* Placeholder for view selector, etc. */}
+                     <h2 className="text-xl font-semibold capitalize">{format(currentDate, "MMMM yyyy", { locale: es })}</h2>
                 </div>
             </header>
             <div className="flex flex-1 overflow-hidden">
-                <div className="w-16 text-xs text-center text-muted-foreground pt-[72px]">
-                    {eachHourOfInterval({ start: setHours(new Date(), 7), end: setHours(new Date(), 18) }).map(hour => (
-                        <div key={hour.toISOString()} className="h-24 flex items-start justify-center pt-1">
-                            <span>{format(hour, "p", { locale: es })}</span>
+                <div className="w-16 text-xs text-center text-muted-foreground pt-[72px] dark:border-slate-700">
+                    {eachHourOfInterval({ start: setHours(new Date(), 8), end: setHours(new Date(), 19) }).map(hour => (
+                        <div key={hour.toISOString()} className="h-24 flex items-start justify-center pt-1 border-t dark:border-slate-800 -ml-1">
+                            <span className="text-slate-400">{format(hour, "ha", { locale: es })}</span>
                         </div>
                     ))}
                 </div>

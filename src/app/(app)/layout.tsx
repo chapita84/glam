@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import type { PropsWithChildren } from 'react';
@@ -129,7 +130,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
     return child;
   });
 
-  const mainContentPadding = pathname === '/appointments' ? 'p-0' : 'p-4 sm:px-6 sm:py-6';
+  const mainContentPadding = 'p-4 sm:px-6 sm:py-6';
   
   return (
     <SidebarProvider>

@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import { AppointmentsCalendar } from "@/components/appointments-calendar";
