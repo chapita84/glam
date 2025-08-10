@@ -63,6 +63,7 @@ const navItems = [
 export type Permission = {
   id: string;
   label: string;
+  children?: Permission[];
 };
 
 export type Role = {
@@ -71,12 +72,34 @@ export type Role = {
   permissions: Set<string>;
 };
 
-// This seems to be a business logic constant for now.
+// Hierarchical permission structure
 export const allPermissions: Permission[] = [
-    { id: "agenda_view", label: "Ver Agenda" },
-    { id: "agenda_manage", label: "Gestionar Agenda" },
-    { id: "services_manage", label: "Gestionar Servicios" },
-    { id: "staff_manage", label: "Gestionar Personal" },
+    {
+        id: "agenda",
+        label: "Agenda",
+        children: [
+            { id: "agenda_view", label: "Ver" },
+            { id: "agenda_manage", label: "Gestionar" },
+        ]
+    },
+    {
+        id: "management",
+        label: "Gestión",
+        children: [
+             { id: "services_manage", label: "Gestionar Servicios" },
+             { id: "staff_manage", label: "Gestionar Personal" },
+             { id: "budgets_manage", label: "Gestionar Presupuestos" },
+        ]
+    },
+    {
+        id: "config",
+        label: "Configuración",
+        children: [
+            { id: "roles_manage", label: "Gestionar Roles" },
+            { id: "settings_manage", label: "Gestionar Ajustes" },
+            { id: "billing_manage", label: "Gestionar Facturación" },
+        ]
+    },
     { id: "reports_view", label: "Ver Reportes" },
 ];
 

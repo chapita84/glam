@@ -1,10 +1,10 @@
 
+
 'use client'
 
 import React, { useState } from "react"
 import type { Role, Permission } from "../layout"
 import { addOrUpdateRole, deleteRole } from "@/lib/firebase/firestore";
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,13 +14,6 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Table,
   TableBody,
   TableCell,
@@ -28,19 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { MoreHorizontal, PlusCircle } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
+import { PlusCircle, Trash2 } from "lucide-react"
+import { PermissionsTree } from "@/components/permissions-tree";
 
 interface RolesPageProps {
   roles: Role[];
@@ -51,50 +34,51 @@ interface RolesPageProps {
 }
 
 export default function RolesPage({ roles = [], allPermissions = [], refreshData, loading, tenantId }: RolesPageProps) {
-  const [open, setOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-
-  const handleOpenDialog = (role: Role | null) => {
-    setEditingRole(role);
-    setOpen(true);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [newRoleName, setNewRoleName] = useState("");
+  
+  const handleSelectRole = (role: Role) => {
+    setSelectedRole(role);
   };
 
-  const handleSaveRole = async (event: React.FormEvent<HTMLFormElement>, tenantId: string) => {
-    event.preventDefault();
-    if (!tenantId) {
-      console.error("Tenant ID is missing.");
-      // Optionally show an error to the user
-      return;
+  const handlePermissionsChange = async (newPermissions: Set<string>) => {
+    if (selectedRole) {
+      const updatedRole = { 
+        ...selectedRole, 
+        permissions: Array.from(newPermissions) 
+      };
+      await addOrUpdateRole(tenantId, updatedRole);
+      refreshData();
+      // Update selected role in state to reflect changes instantly
+      setSelectedRole({...selectedRole, permissions: newPermissions});
     }
-    const form = event.currentTarget;
-    const roleName = (form.elements.namedItem('role-name') as HTMLInputElement).value;
-    const selectedPermissions = new Set(
-        (allPermissions || [])
-            .filter(p => (form.elements.namedItem(`perm-${p.id}`) as HTMLInputElement).checked)
-            .map(p => p.id)
-    );
+  };
 
-    if (roleName) {
-        const roleId = editingRole?.id || roleName.toLowerCase().replace(/\s+/g, '_');
-        const roleData = { 
-            id: roleId, 
-            name: roleName, 
-            permissions: Array.from(selectedPermissions) // Firestore works better with arrays
-        };
-        
-        await addOrUpdateRole(tenantId, roleData);
-        
-        setOpen(false);
-        setEditingRole(null);
-        await refreshData(); // Refresh data from Firestore
-    }
+  const handleAddNewRole = async () => {
+    if (newRoleName.trim() === "") return;
+    const newRole = {
+      id: newRoleName.toLowerCase().replace(/\s+/g, '_'),
+      name: newRoleName,
+      permissions: []
+    };
+    await addOrUpdateRole(tenantId, newRole);
+    setNewRoleName("");
+    refreshData();
   };
 
   const handleDeleteRole = async (roleId: string) => {
-      if (confirm('¿Estás seguro de que quieres eliminar este rol?')) {
-          await deleteRole(tenantId, roleId);
-          await refreshData(); // Refresh data from Firestore
+    const roleToDelete = roles.find(r => r.id === roleId);
+    if (roleToDelete?.name === 'Propietario') {
+        alert("El rol de Propietario no se puede eliminar.");
+        return;
+    }
+    if (confirm('¿Estás seguro de que quieres eliminar este rol?')) {
+      await deleteRole(tenantId, roleId);
+      if (selectedRole?.id === roleId) {
+        setSelectedRole(null);
       }
+      refreshData();
+    }
   };
 
   if (loading) {
@@ -102,103 +86,81 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshData
   }
 
   return (
-    <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Roles y Permisos</h1>
-            <Dialog open={open} onOpenChange={(isOpen) => {
-                setOpen(isOpen);
-                if (!isOpen) {
-                    setEditingRole(null);
-                }
-            }}>
-                <DialogTrigger asChild>
-                    <Button onClick={() => handleOpenDialog(null)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Crear Rol
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                    <form onSubmit={(e) => handleSaveRole(e, tenantId)}>
-                        <DialogHeader>
-                            <DialogTitle>{editingRole ? "Editar Rol" : "Crear Nuevo Rol"}</DialogTitle>
-                            <DialogDescription>
-                                {editingRole ? "Actualiza el nombre y los permisos de este rol." : "Define un nuevo rol y asígnale permisos específicos para tu equipo."}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="role-name" className="text-right">Nombre</Label>
-                                <Input id="role-name" name="role-name" defaultValue={editingRole?.name} placeholder="p. ej. Asistente" className="col-span-3" required/>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Permisos</Label>
-                                <div className="grid gap-2">
-                                    {(allPermissions || []).map(p => (
-                                        <div key={p.id} className="flex items-center gap-2">
-                                            <Checkbox 
-                                                id={`perm-${p.id}`} 
-                                                name={`perm-${p.id}`}
-                                                defaultChecked={editingRole?.permissions.has(p.id)}
-                                            />
-                                            <Label htmlFor={`perm-${p.id}`} className="font-normal">{p.label}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+    <div className="flex flex-col gap-6 h-full">
+        <h1 className="text-3xl font-bold tracking-tight">Roles y Permisos</h1>
+        <div className="grid md:grid-cols-2 gap-8 flex-1">
+            {/* Columna Izquierda: Lista de Roles */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Listado de Roles</CardTitle>
+                    <CardDescription>
+                        Selecciona un rol para editar sus permisos, o crea uno nuevo.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-2 mb-4">
+                        <Input 
+                            placeholder="Nombre del nuevo rol" 
+                            value={newRoleName}
+                            onChange={(e) => setNewRoleName(e.target.value)}
+                        />
+                        <Button onClick={handleAddNewRole}><PlusCircle className="mr-2"/> Añadir</Button>
+                    </div>
+                     <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Rol</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {(roles || []).map((role) => (
+                            <TableRow 
+                                key={role.id} 
+                                onClick={() => handleSelectRole(role)}
+                                className={`cursor-pointer ${selectedRole?.id === role.id ? 'bg-muted/80' : ''}`}
+                            >
+                                <TableCell className="font-medium">{role.name}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
+                                        disabled={role.name === 'Propietario'}
+                                    >
+                                        <Trash2 className="h-4 w-4 text-destructive"/>
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            {/* Columna Derecha: Árbol de Permisos */}
+            <Card>
+                 <CardHeader>
+                    <CardTitle>Permisos del Rol</CardTitle>
+                    <CardDescription>
+                        {selectedRole ? `Editando permisos para "${selectedRole.name}"` : "Selecciona un rol para ver sus permisos"}
+                    </CardDescription>
+                </CardHeader>
+                 <CardContent>
+                    {selectedRole ? (
+                        <PermissionsTree 
+                            permissions={allPermissions} 
+                            rolePermissions={selectedRole.permissions}
+                            onPermissionsChange={handlePermissionsChange}
+                        />
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                            <p>Por favor, selecciona un rol de la lista.</p>
                         </div>
-                        <DialogFooter>
-                            <Button type="submit">Guardar Rol</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                    )}
+                </CardContent>
+            </Card>
         </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Tus Roles</CardTitle>
-          <CardDescription>
-            Gestiona los roles de tu personal y los permisos asociados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rol</TableHead>
-                <TableHead>Permisos Activos</TableHead>
-                <TableHead>
-                  <span className="sr-only">Acciones</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(roles || []).map((role) => (
-                <TableRow key={role.id}>
-                  <TableCell className="font-medium">{role.name}</TableCell>
-                  <TableCell>
-                    <Badge variant={role.name === "Propietario" ? "default" : "secondary"}>{role.permissions.size} de {(allPermissions || []).length}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost" disabled={role.name === 'Propietario'}>
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">Menú</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(role)}>Editar</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteRole(role.id)}>Eliminar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   )
 }
