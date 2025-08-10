@@ -1,7 +1,8 @@
 
 'use client'
 
-import { useState } from "react"
+import React, { useState } from "react"
+import type { Role, Permission } from "../layout"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,36 +41,13 @@ import { Label } from "@/components/ui/label"
 import { MoreHorizontal, PlusCircle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
-type Permission = {
-  id: string;
-  label: string;
-};
+interface RolesPageProps {
+  roles: Role[];
+  setRoles: React.Dispatch<React.SetStateAction<Role[]>>;
+  allPermissions: Permission[];
+}
 
-type Role = {
-  id: string;
-  name: string;
-  permissions: Set<string>;
-};
-
-const allPermissions: Permission[] = [
-    { id: "agenda_view", label: "Ver Agenda" },
-    { id: "agenda_manage", label: "Gestionar Agenda" },
-    { id: "services_manage", label: "Gestionar Servicios" },
-    { id: "staff_manage", label: "Gestionar Personal" },
-    { id: "reports_view", label: "Ver Reportes" },
-];
-
-const initialRoles: Role[] = [
-  { id: "estilista_principal", name: "Estilista Principal", permissions: new Set(allPermissions.map(p => p.id)) },
-  { id: "estilista", name: "Estilista", permissions: new Set(["agenda_view", "agenda_manage", "services_manage", "staff_manage"]) },
-  { id: "artista_de_unas", name: "Artista de Uñas", permissions: new Set(["agenda_view", "agenda_manage", "services_manage"]) },
-  { id: "recepcionista", name: "Recepcionista", permissions: new Set(["agenda_view", "agenda_manage"]) },
-  { id: "propietario", name: "Propietario", permissions: new Set(allPermissions.map(p => p.id)) },
-];
-
-
-export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>(initialRoles);
+export default function RolesPage({ roles, setRoles, allPermissions }: RolesPageProps) {
   const [open, setOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
@@ -90,10 +68,8 @@ export default function RolesPage() {
 
     if (roleName) {
         if (editingRole) {
-            // Update existing role
             setRoles(roles.map(r => r.id === editingRole.id ? { ...r, name: roleName, permissions: selectedPermissions } : r));
         } else {
-            // Add new role
             const newId = roleName.toLowerCase().replace(/\s+/g, '_');
             setRoles([...roles, { id: newId, name: roleName, permissions: selectedPermissions }]);
         }

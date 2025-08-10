@@ -1,3 +1,8 @@
+
+'use client'
+
+import type { PropsWithChildren } from 'react';
+import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,8 +37,6 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import Link from 'next/link';
-import type { PropsWithChildren } from 'react';
-import React from 'react';
 
 function SparkleIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -71,7 +74,43 @@ const navItems = [
     { href: "/budgets", icon: Wand2, label: "Presupuestos" },
 ]
 
+export type Permission = {
+  id: string;
+  label: string;
+};
+
+export type Role = {
+  id: string;
+  name: string;
+  permissions: Set<string>;
+};
+
+const allPermissions: Permission[] = [
+    { id: "agenda_view", label: "Ver Agenda" },
+    { id: "agenda_manage", label: "Gestionar Agenda" },
+    { id: "services_manage", label: "Gestionar Servicios" },
+    { id: "staff_manage", label: "Gestionar Personal" },
+    { id: "reports_view", label: "Ver Reportes" },
+];
+
+const initialRoles: Role[] = [
+  { id: "estilista_principal", name: "Estilista Principal", permissions: new Set(allPermissions.map(p => p.id)) },
+  { id: "estilista", name: "Estilista", permissions: new Set(["agenda_view", "agenda_manage", "services_manage", "staff_manage"]) },
+  { id: "artista_de_unas", name: "Artista de Uñas", permissions: new Set(["agenda_view", "agenda_manage", "services_manage"]) },
+  { id: "recepcionista", name: "Recepcionista", permissions: new Set(["agenda_view", "agenda_manage"]) },
+  { id: "propietario", name: "Propietario", permissions: new Set(allPermissions.map(p => p.id)) },
+];
+
 export default function AppLayout({ children }: PropsWithChildren) {
+  const [roles, setRoles] = useState<Role[]>(initialRoles);
+  const childrenWithProps = React.Children.map(children, child => {
+    if (React.isValidElement(child)) {
+      // @ts-ignore
+      return React.cloneElement(child, { roles, setRoles, allPermissions });
+    }
+    return child;
+  });
+  
   return (
     <SidebarProvider>
       <Sidebar side="left" variant="sidebar" collapsible="icon">
@@ -146,8 +185,9 @@ export default function AppLayout({ children }: PropsWithChildren) {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex-1 p-4 sm:px-6 sm:py-6">{children}</main>
+        <main className="flex-1 p-4 sm:px-6 sm:py-6">{childrenWithProps}</main>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+
