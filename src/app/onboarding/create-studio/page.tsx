@@ -35,7 +35,7 @@ export default function CreateStudioPage() {
       <div className="w-full max-w-md p-4">
         <div className="text-center mb-8">
             <Fingerprint className="mx-auto h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-wider mt-2">GlamDash</h1>
+            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty Dash</h1>
         </div>
         <Card>
           <CardHeader className="text-center">

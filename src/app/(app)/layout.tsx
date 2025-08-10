@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import type { PropsWithChildren } from 'react';
@@ -139,7 +138,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             <div className="flex items-center gap-2 p-2">
                 <Fingerprint className="w-8 h-8 text-sidebar-primary" />
                 <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsible=icon]:hidden">
-                    GlamDash
+                    Glam&Beauty Dash
                 </h1>
             </div>
         </SidebarHeader>
@@ -164,6 +163,14 @@ export default function AppLayout({ children }: PropsWithChildren) {
                     <Link href="/login">
                         <LogOut />
                         <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
+                    </Link>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Ajustes">
+                    <Link href="/settings">
+                        <Settings />
+                        <span className="group-data-[collapsible=icon]:hidden">Ajustes</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

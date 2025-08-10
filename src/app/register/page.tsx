@@ -66,7 +66,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md p-4">
         <div className="text-center mb-8">
             <Fingerprint className="mx-auto h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-wider mt-2">GlamDash</h1>
+            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty Dash</h1>
             <p className="text-muted-foreground">Crea una cuenta para empezar a gestionar tu estudio o reservar servicios.</p>
         </div>
         <Card>

@@ -122,7 +122,7 @@ export default function SearchPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-40 w-full border-b bg-background">
         <div className="container mx-auto flex h-16 items-center px-4 md:px-6">
-            <h1 className="text-2xl font-bold tracking-wider mr-6">Glam&Beauty</h1>
+            <h1 className="text-2xl font-bold tracking-wider mr-6">Glam&Beauty Dash</h1>
             <div className="relative w-full max-w-lg">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input placeholder="Buscar por estudio o servicio..." className="pl-10" />
