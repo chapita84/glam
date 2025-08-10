@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -47,14 +47,9 @@ interface ServicesPageProps {
   loading: boolean;
 }
 
-export default function ServicesPage({ services: initialServices = [], tenantId, refreshData, loading }: ServicesPageProps) {
-  const [services, setServices] = useState<Service[]>(initialServices);
+export default function ServicesPage({ services = [], tenantId, refreshData, loading }: ServicesPageProps) {
   const [open, setOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-
-  useEffect(() => {
-    setServices(initialServices);
-  }, [initialServices]);
 
   const handleSaveService = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
