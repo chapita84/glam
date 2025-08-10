@@ -47,8 +47,8 @@ const mockStudioData = {
 };
 
 
-export default function StudioProfilePage({ params }: { params: { slug: string } }) {
-    // En un futuro, aquí se haría un fetch a la base de datos usando params.slug
+export default function StudioProfilePage({ params: { slug } }: { params: { slug: string } }) {
+    // En un futuro, aquí se haría un fetch a la base de datos usando el slug
     const studio = mockStudioData;
 
     return (
