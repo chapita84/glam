@@ -1,12 +1,19 @@
-
-
-
-
-
 import { db } from './config';
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import type { Role } from '@/app/(app)/layout';
+import type { Role, Permission } from '@/app/(app)/layout';
 import type { BudgetItem as AIBudgetItem } from '@/app/(app)/budgets/actions';
+
+// This is a temporary function to get all permission IDs for the owner role.
+const getAllPermissionIds = (permissions: Permission[]): string[] => {
+    let ids: string[] = [];
+    permissions.forEach(p => {
+        ids.push(p.id);
+        if (p.children) {
+            ids = ids.concat(getAllPermissionIds(p.children));
+        }
+    });
+    return ids;
+};
 
 
 // Type for role data stored in Firestore
@@ -182,6 +189,7 @@ export async function updateTenantConfig(tenantId: string, config: TenantConfig)
 
 /**
  * Fetches all roles for a given tenant from Firestore.
+ * If no roles exist, it seeds a default "Owner" role.
  * @param tenantId The ID of the tenant.
  * @returns A promise that resolves to an array of Role objects.
  */
@@ -189,15 +197,33 @@ export async function getRoles(tenantId: string): Promise<Role[]> {
     const rolesCollectionRef = collection(db, 'tenants', tenantId, 'roles');
     try {
         const querySnapshot = await getDocs(rolesCollectionRef);
-        const roles: Role[] = [];
+        let roles: Role[] = [];
         querySnapshot.forEach((doc) => {
             const data = doc.data() as RoleFirestoreData;
             roles.push({
                 id: data.id,
                 name: data.name,
-                permissions: new Set(data.permissions || []), // Convert array to Set
+                permissions: new Set(data.permissions || []),
             });
         });
+
+        if (roles.length === 0) {
+            console.log("No roles found, seeding 'Propietario' role...");
+            const allPermissions: Permission[] = [
+                { id: "agenda", label: "Agenda", children: [{ id: "agenda_view", label: "Ver" }, { id: "agenda_manage", label: "Gestionar" }] },
+                { id: "management", label: "Gestión", children: [{ id: "services_manage", label: "Gestionar Servicios" }, { id: "staff_manage", label: "Gestionar Personal" }, { id: "budgets_manage", label: "Gestionar Presupuestos" }] },
+                { id: "config", label: "Configuración", children: [{ id: "roles_manage", label: "Gestionar Roles" }, { id: "settings_manage", label: "Gestionar Ajustes" }, { id: "billing_manage", label: "Gestionar Facturación" }] },
+                { id: "reports_view", label: "Ver Reportes" },
+            ];
+            const ownerRole = {
+                id: 'owner',
+                name: 'Propietario',
+                permissions: getAllPermissionIds(allPermissions),
+            };
+            await addOrUpdateRole(tenantId, ownerRole);
+            roles.push({ ...ownerRole, permissions: new Set(ownerRole.permissions) });
+        }
+
         return roles;
     } catch (error) {
         console.error("Error fetching roles: ", error);
@@ -210,12 +236,12 @@ export async function getRoles(tenantId: string): Promise<Role[]> {
  * @param tenantId The ID of the tenant.
  * @param role The role object to add or update. The id will be used as the document ID.
  */
-export async function addOrUpdateRole(tenantId: string, role: {id: string, name: string, permissions: string[]}): Promise<void> {
+export async function addOrUpdateRole(tenantId: string, role: {id: string, name: string, permissions: string[] | Set<string>}): Promise<void> {
     const roleDocRef = doc(db, 'tenants', tenantId, 'roles', role.id);
     const roleData: RoleFirestoreData = {
         id: role.id,
         name: role.name,
-        permissions: role.permissions,
+        permissions: Array.isArray(role.permissions) ? role.permissions : Array.from(role.permissions),
     }
     try {
         await setDoc(roleDocRef, roleData, { merge: true });
@@ -243,12 +269,27 @@ export async function deleteRole(tenantId: string, roleId: string): Promise<void
 
 /**
  * Fetches all staff members for a given tenant from Firestore.
+ * If no staff members exist, it seeds a default "Admin" user.
  */
 export async function getStaff(tenantId: string): Promise<StaffMember[]> {
     const staffCollectionRef = collection(db, 'tenants', tenantId, 'staff');
     try {
         const querySnapshot = await getDocs(staffCollectionRef);
-        return querySnapshot.docs.map(doc => doc.data() as StaffMember);
+        const staff = querySnapshot.docs.map(doc => doc.data() as StaffMember);
+        
+        if (staff.length === 0) {
+            console.log("No staff found, seeding default admin user...");
+            const adminUser = {
+                id: 'admin@example.com',
+                name: 'Admin User',
+                email: 'admin@example.com',
+                roleId: 'owner',
+            };
+            await addOrUpdateStaffMember(tenantId, adminUser);
+            staff.push(adminUser);
+        }
+        
+        return staff;
     } catch (error) {
         console.error("Error fetching staff: ", error);
         return [];
@@ -288,12 +329,26 @@ export async function deleteStaffMember(tenantId: string, userId: string): Promi
 
 /**
  * Fetches all services for a given tenant from Firestore.
+ * If no services exist, it seeds some example services.
  */
 export async function getServices(tenantId: string): Promise<Service[]> {
     const servicesCollectionRef = collection(db, 'tenants', tenantId, 'services');
     try {
         const querySnapshot = await getDocs(servicesCollectionRef);
-        return querySnapshot.docs.map(doc => doc.data() as Service);
+        const services = querySnapshot.docs.map(doc => doc.data() as Service);
+
+        if (services.length === 0) {
+            console.log("No services found, seeding example services...");
+            const defaultServices: Service[] = [
+                { id: 'corte-de-pelo', name: 'Corte de Cabello', category: 'Peluquería', duration: 60, price: 50 },
+                { id: 'manicura-clasica', name: 'Manicura Clásica', category: 'Uñas', duration: 30, price: 25 },
+            ];
+            for (const service of defaultServices) {
+                await addOrUpdateService(tenantId, service);
+                services.push(service);
+            }
+        }
+        return services;
     } catch (error) {
         console.error("Error fetching services: ", error);
         return [];
@@ -352,6 +407,31 @@ export async function getBookings(tenantId: string): Promise<Booking[]> {
                 endTime: endTime,
             } as Booking;
         });
+
+        // Seed a booking if none exist, using seeded data
+        if (bookings.length === 0) {
+            console.log("No bookings found, attempting to seed an example booking...");
+             const today = new Date();
+             const startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14, 0, 0); // Today at 2 PM
+
+            const newBooking: Omit<Booking, 'id' | 'createdAt' | 'endTime'> = {
+                clientName: "Cliente de Ejemplo",
+                clientId: 'example-client',
+                staffId: 'admin@example.com',
+                staffName: "Admin User",
+                serviceId: 'corte-de-pelo',
+                serviceName: 'Corte de Cabello',
+                duration: 60,
+                startTime: startTime,
+                status: 'confirmed',
+                price: { amount: 50, currency: 'USD' },
+                notes: 'Cita autogenerada de ejemplo.',
+            };
+            await addOrUpdateBooking(tenantId, newBooking);
+            // We can just return the newly created booking to show it immediately
+            return [{...newBooking, id: 'seeded-booking', endTime: new Date(startTime.getTime() + 60 * 60000)}];
+        }
+
         return bookings;
     } catch (error) {
         console.error("Error fetching bookings: ", error);
@@ -408,7 +488,41 @@ export async function getBudgets(tenantId: string): Promise<Budget[]> {
     const q = query(budgetsCollectionRef, orderBy('createdAt', 'desc'));
     try {
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
+        const budgets = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
+
+        if (budgets.length === 0) {
+            console.log("No budgets found, seeding example budget...");
+            const today = new Date();
+            const eventDate = new Date(today.setDate(today.getDate() + 14)); // 2 weeks from now
+
+            const newBudget: Budget = {
+                budgetName: "Presupuesto Boda - Cliente Ejemplo",
+                clientName: "Cliente de Ejemplo",
+                status: 'draft',
+                eventInfo: {
+                    type: "Boda",
+                    date: eventDate.toISOString().split('T')[0],
+                    time: "17:00",
+                    location: "Salón de Fiestas 'El Roble'",
+                },
+                items: [
+                    { description: "Maquillaje de Novia", category: "Maquillaje", quantity: 1, unitCost: { amount: 250, currency: 'USD' }, duration: 120 },
+                    { description: "Peinado de Novia", category: "Peluquería", quantity: 1, unitCost: { amount: 200, currency: 'USD' }, duration: 90 },
+                ],
+                summary: {
+                    subtotal: 450,
+                    logistics: 100,
+                    totalUSD: 550,
+                    exchangeRate: 900,
+                    totalARS: 550 * 900,
+                },
+                totalDuration: 210,
+            };
+            const newBudgetId = await addOrUpdateBudget(tenantId, newBudget);
+            return [{...newBudget, id: newBudgetId}];
+        }
+
+        return budgets;
     } catch (error) {
         console.error("Error fetching budgets: ", error);
         return [];
@@ -459,3 +573,5 @@ export async function deleteBudget(tenantId: string, budgetId: string): Promise<
         console.error("Error deleting budget: ", error);
     }
 }
+
+    

@@ -47,7 +47,11 @@ export function PermissionsTree({ permissions, rolePermissions, onPermissionsCha
 
   const handleCheckChange = (permissionId: string, isChecked: boolean) => {
     const newChecked = new Set(checkedPermissions);
+    const permissionInfo = findPermissionAndParent(permissions, permissionId);
 
+    if (!permissionInfo) return;
+    
+    // Update self and all children
     const updateChildren = (perm: Permission, check: boolean) => {
         const childIds = getChildPermissionIds(perm);
         [perm.id, ...childIds].forEach(id => {
@@ -55,13 +59,9 @@ export function PermissionsTree({ permissions, rolePermissions, onPermissionsCha
             else newChecked.delete(id);
         });
     };
+    updateChildren(permissionInfo.p, isChecked);
     
-    const permissionInfo = findPermissionAndParent(permissions, permissionId);
-    if (permissionInfo) {
-      updateChildren(permissionInfo.p, isChecked);
-    }
-    
-    // Check parents upwards
+    // Update parents upwards
     const updateParents = (id: string) => {
         const info = findPermissionAndParent(permissions, id);
         if (info && info.parent) {
@@ -102,9 +102,8 @@ export function PermissionsTree({ permissions, rolePermissions, onPermissionsCha
           <Checkbox
             id={permission.id}
             checked={isChecked}
-            // @ts-ignore - Radix supports indeterminate state
-            onCheckedChange={(checked) => handleCheckChange(permission.id, checked === 'indeterminate' ? true : !!checked)}
-            data-state={isIndeterminate ? 'indeterminate' : (isChecked ? 'checked' : 'unchecked')}
+            onCheckedChange={(checked) => handleCheckChange(permission.id, !!checked)}
+            aria-checked={isIndeterminate ? 'mixed' : isChecked}
           />
           <label htmlFor={permission.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {permission.label}
@@ -135,3 +134,5 @@ export function PermissionsTree({ permissions, rolePermissions, onPermissionsCha
     </div>
   );
 }
+
+    
