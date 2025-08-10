@@ -2,7 +2,8 @@
 'use client'
 
 import type { PropsWithChildren } from 'react';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getRoles } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -85,6 +86,7 @@ export type Role = {
   permissions: Set<string>;
 };
 
+// This seems to be a business logic constant for now.
 const allPermissions: Permission[] = [
     { id: "agenda_view", label: "Ver Agenda" },
     { id: "agenda_manage", label: "Gestionar Agenda" },
@@ -93,21 +95,32 @@ const allPermissions: Permission[] = [
     { id: "reports_view", label: "Ver Reportes" },
 ];
 
-const initialRoles: Role[] = [
-  { id: "estilista_principal", name: "Estilista Principal", permissions: new Set(allPermissions.map(p => p.id)) },
-  { id: "estilista", name: "Estilista", permissions: new Set(["agenda_view", "agenda_manage", "services_manage", "staff_manage"]) },
-  { id: "artista_de_unas", name: "Artista de Uñas", permissions: new Set(["agenda_view", "agenda_manage", "services_manage"]) },
-  { id: "recepcionista", name: "Recepcionista", permissions: new Set(["agenda_view", "agenda_manage"]) },
-  { id: "propietario", name: "Propietario", permissions: new Set(allPermissions.map(p => p.id)) },
-];
 
 export default function AppLayout({ children }: PropsWithChildren) {
-  const [roles, setRoles] = useState<Role[]>(initialRoles);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRoles() {
+      const tenantId = "test-tenant"; // Using a mock tenantId for now
+      const fetchedRoles = await getRoles(tenantId);
+      setRoles(fetchedRoles);
+      setLoading(false);
+    }
+    fetchRoles();
+  }, []);
+
+  // Callback to refresh roles from Firestore
+  const refreshRoles = async () => {
+    const tenantId = "test-tenant";
+    const fetchedRoles = await getRoles(tenantId);
+    setRoles(fetchedRoles);
+  };
   
   const childrenWithProps = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
       // @ts-ignore - cloning child to pass props
-      return React.cloneElement(child, { roles, setRoles, allPermissions });
+      return React.cloneElement(child, { roles, allPermissions, refreshRoles, loading });
     }
     return child;
   });
@@ -186,7 +199,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex-1 p-4 sm:px-6 sm:py-6">{childrenWithProps}</main>
+        <main className="flex-1 p-4 sm:px-6 sm:py-6">{loading ? <p>Cargando datos...</p> : childrenWithProps}</main>
       </SidebarInset>
     </SidebarProvider>
   );

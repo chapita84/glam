@@ -58,9 +58,10 @@ const initialStaffMembers: StaffMember[] = [
 
 interface StaffPageProps {
   roles: Role[];
+  loading: boolean;
 }
 
-export default function StaffPage({ roles = [] }: StaffPageProps) {
+export default function StaffPage({ roles = [], loading }: StaffPageProps) {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>(initialStaffMembers)
   const [open, setOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
@@ -74,7 +75,9 @@ export default function StaffPage({ roles = [] }: StaffPageProps) {
     event.preventDefault();
     const form = event.currentTarget;
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
-    const roleId = (form.elements.namedItem('roleId') as HTMLInputElement).value;
+    // For Select, value is handled differently. We need to get it from the form data.
+    const formData = new FormData(form);
+    const roleId = formData.get('roleId') as string;
 
     if (email && roleId) {
       if (editingMember) {
@@ -86,6 +89,7 @@ export default function StaffPage({ roles = [] }: StaffPageProps) {
         );
       } else {
         // Add new member (invitation)
+        // Here we would call the serverless function. For now, we simulate it locally.
         const name = email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase());
         const avatar = name.split(' ').map(n => n[0]).join('');
         setStaffMembers([...staffMembers, { name, email, roleId, avatar }]);
@@ -101,6 +105,10 @@ export default function StaffPage({ roles = [] }: StaffPageProps) {
   
   const getRoleName = (roleId: string) => {
     return roles.find(r => r.id === roleId)?.name || 'Sin Rol';
+  }
+  
+  if (loading) {
+    return <p>Cargando equipo...</p>;
   }
 
   return (

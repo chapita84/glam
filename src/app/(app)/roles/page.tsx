@@ -3,6 +3,7 @@
 
 import React, { useState } from "react"
 import type { Role, Permission } from "../layout"
+import { addOrUpdateRole, deleteRole } from "@/lib/firebase/firestore";
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,11 +44,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 interface RolesPageProps {
   roles: Role[];
-  setRoles: React.Dispatch<React.SetStateAction<Role[]>>;
   allPermissions: Permission[];
+  refreshRoles: () => void;
+  loading: boolean;
 }
 
-export default function RolesPage({ roles = [], setRoles, allPermissions = [] }: RolesPageProps) {
+export default function RolesPage({ roles = [], allPermissions = [], refreshRoles, loading }: RolesPageProps) {
   const [open, setOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
@@ -56,7 +58,7 @@ export default function RolesPage({ roles = [], setRoles, allPermissions = [] }:
     setOpen(true);
   };
 
-  const handleSaveRole = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveRole = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const roleName = (form.elements.namedItem('role-name') as HTMLInputElement).value;
@@ -66,23 +68,34 @@ export default function RolesPage({ roles = [], setRoles, allPermissions = [] }:
             .map(p => p.id)
     );
 
-    if (roleName && setRoles) {
-        if (editingRole) {
-            setRoles(roles.map(r => r.id === editingRole.id ? { ...r, name: roleName, permissions: selectedPermissions } : r));
-        } else {
-            const newId = roleName.toLowerCase().replace(/\s+/g, '_');
-            setRoles([...roles, { id: newId, name: roleName, permissions: selectedPermissions }]);
-        }
+    if (roleName) {
+        const tenantId = "test-tenant";
+        const roleId = editingRole?.id || roleName.toLowerCase().replace(/\s+/g, '_');
+        const roleData = { 
+            id: roleId, 
+            name: roleName, 
+            permissions: Array.from(selectedPermissions) // Firestore works better with arrays
+        };
+        
+        await addOrUpdateRole(tenantId, roleData);
+        
         setOpen(false);
         setEditingRole(null);
+        await refreshRoles(); // Refresh data from Firestore
     }
   };
 
-  const handleDeleteRole = (roleId: string) => {
-    if (setRoles) {
-      setRoles(roles.filter(r => r.id !== roleId));
-    }
+  const handleDeleteRole = async (roleId: string) => {
+      if (confirm('¿Estás seguro de que quieres eliminar este rol?')) {
+          const tenantId = "test-tenant";
+          await deleteRole(tenantId, roleId);
+          await refreshRoles(); // Refresh data from Firestore
+      }
   };
+
+  if (loading) {
+    return <p>Cargando roles...</p>;
+  }
 
   return (
     <div className="flex flex-col gap-6">
