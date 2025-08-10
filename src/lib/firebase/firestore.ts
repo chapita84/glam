@@ -1,6 +1,6 @@
 
 import { db } from './config';
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc } from 'firebase/firestore';
 import type { Role } from '@/app/(app)/layout';
 
 // Type for role data stored in Firestore
@@ -53,6 +53,78 @@ export type Booking = {
     createdAt: any;
     notes?: string;
 }
+
+export type WorkingHour = {
+    dayOfWeek: number; // 0 (Sunday) to 6 (Saturday)
+    startTime: string; // "HH:mm"
+    endTime: string;   // "HH:mm"
+    enabled: boolean;
+}
+
+export type TenantConfig = {
+    workingHours: WorkingHour[];
+}
+
+/**
+ * Fetches the configuration for a given tenant from Firestore.
+ * @param tenantId The ID of the tenant.
+ * @returns A promise that resolves to the TenantConfig object or null.
+ */
+export async function getTenantConfig(tenantId: string): Promise<TenantConfig | null> {
+    const configDocRef = doc(db, 'tenants', tenantId);
+    try {
+        const docSnap = await getDoc(configDocRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            // Provide default working hours if they don't exist
+            const workingHours = data.config?.workingHours ?? [
+                { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', enabled: true },
+                { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', enabled: true },
+                { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', enabled: true },
+                { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', enabled: true },
+                { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', enabled: true },
+                { dayOfWeek: 6, startTime: '09:00', endTime: '14:00', enabled: false },
+                { dayOfWeek: 0, startTime: '09:00', endTime: '14:00', enabled: false },
+            ];
+            return {
+                workingHours: workingHours.sort((a: WorkingHour, b: WorkingHour) => a.dayOfWeek - b.dayOfWeek),
+            };
+        } else {
+             // Provide default working hours if the document doesn't exist
+            return {
+                workingHours: [
+                    { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', enabled: true },
+                    { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', enabled: true },
+                    { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', enabled: true },
+                    { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', enabled: true },
+                    { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', enabled: true },
+                    { dayOfWeek: 6, startTime: '09:00', endTime: '14:00', enabled: false },
+                    { dayOfWeek: 0, startTime: '09:00', endTime: '14:00', enabled: false },
+                ].sort((a: WorkingHour, b: WorkingHour) => a.dayOfWeek - b.dayOfWeek),
+            };
+        }
+    } catch (error) {
+        console.error("Error fetching tenant config: ", error);
+        return null;
+    }
+}
+
+/**
+ * Updates the configuration for a given tenant in Firestore.
+ * @param tenantId The ID of the tenant.
+ * @param config The new configuration object.
+ */
+export async function updateTenantConfig(tenantId: string, config: TenantConfig): Promise<void> {
+    const configDocRef = doc(db, 'tenants', tenantId);
+    try {
+        await setDoc(configDocRef, { config }, { merge: true });
+        console.log("Tenant config updated successfully.");
+    } catch (error) {
+        console.error("Error updating tenant config: ", error);
+        throw error;
+    }
+}
+
 
 /**
  * Fetches all roles for a given tenant from Firestore.
@@ -216,7 +288,8 @@ export async function getBookings(tenantId: string): Promise<Booking[]> {
         const querySnapshot = await getDocs(bookingsCollectionRef);
         const bookings = querySnapshot.docs.map((doc) => {
             const data = doc.data();
-            const startTime = data.startTime.toDate();
+            // Firestore timestamps need to be converted to JS Date objects
+            const startTime = data.startTime?.toDate ? data.startTime.toDate() : new Date();
             const endTime = new Date(startTime.getTime() + data.duration * 60000);
             return {
                 ...data,

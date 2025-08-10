@@ -2,18 +2,19 @@
 'use client'
 
 import { AppointmentsCalendar } from "@/components/appointments-calendar";
-import { type Booking, type Service, type StaffMember } from "@/lib/firebase/firestore";
+import { type Booking, type Service, type StaffMember, type TenantConfig } from "@/lib/firebase/firestore";
 
 interface AppointmentsPageProps {
   staff: StaffMember[];
   services: Service[];
   bookings: Booking[];
+  config: TenantConfig | null;
   tenantId: string;
   refreshData: () => void;
   loading: boolean;
 }
 
-export default function AppointmentsPage({ staff, services, bookings, tenantId, refreshData, loading }: AppointmentsPageProps) {
+export default function AppointmentsPage({ staff, services, bookings, config, tenantId, refreshData, loading }: AppointmentsPageProps) {
     const handleBookingCreated = () => {
         if (refreshData) {
             refreshData(); 
@@ -31,6 +32,7 @@ export default function AppointmentsPage({ staff, services, bookings, tenantId, 
                 bookings={bookings || []} 
                 staff={staff || []}
                 services={services || []}
+                config={config}
                 tenantId={tenantId}
                 onBookingCreated={handleBookingCreated}
             />

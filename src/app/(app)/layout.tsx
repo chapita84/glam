@@ -3,7 +3,7 @@
 
 import type { PropsWithChildren } from 'react';
 import React, { useState, useEffect, useCallback } from 'react';
-import { getRoles, getStaff, getServices, getBookings, type StaffMember, type Service, type Booking } from '@/lib/firebase/firestore';
+import { getRoles, getStaff, getServices, getBookings, getTenantConfig, type StaffMember, type Service, type Booking, type TenantConfig } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,7 +60,7 @@ export type Role = {
 };
 
 // This seems to be a business logic constant for now.
-const allPermissions: Permission[] = [
+export const allPermissions: Permission[] = [
     { id: "agenda_view", label: "Ver Agenda" },
     { id: "agenda_manage", label: "Gestionar Agenda" },
     { id: "services_manage", label: "Gestionar Servicios" },
@@ -74,23 +74,26 @@ export default function AppLayout({ children }: PropsWithChildren) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [config, setConfig] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Using a mock tenantId for now
+  // Using a mock tenantId for now.
   const tenantId = "test-tenant";
 
   const refreshData = useCallback(async () => {
     setLoading(true);
-    const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings] = await Promise.all([
+    const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings, fetchedConfig] = await Promise.all([
       getRoles(tenantId),
       getStaff(tenantId),
       getServices(tenantId),
-      getBookings(tenantId)
+      getBookings(tenantId),
+      getTenantConfig(tenantId),
     ]);
     setRoles(fetchedRoles);
     setStaff(fetchedStaff);
     setServices(fetchedServices);
     setBookings(fetchedBookings);
+    setConfig(fetchedConfig);
     setLoading(false);
   }, [tenantId]);
   
@@ -106,6 +109,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
           staff,
           services,
           bookings,
+          config,
           allPermissions, 
           refreshData, 
           loading,
@@ -175,9 +179,11 @@ export default function AppLayout({ children }: PropsWithChildren) {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Configuración</span>
+              <DropdownMenuItem asChild>
+                <Link href="/settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Ajustes</span>
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
                <DropdownMenuItem asChild>
