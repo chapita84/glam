@@ -10,7 +10,7 @@ import { Save } from 'lucide-react';
 
 interface PermissionsTreeProps {
   permissions: Permission[];
-  rolePermissions: Set<string>;
+  rolePermissions?: Set<string>;
   onPermissionsChange: (newPermissions: Set<string>) => void;
 }
 
@@ -83,6 +83,7 @@ export function PermissionsTree({ permissions, rolePermissions, onPermissionsCha
   };
   
   const handleSave = async () => {
+    if (!rolePermissions) return;
     setIsSaving(true);
     await onPermissionsChange(checkedPermissions);
     setIsSaving(false);
@@ -126,7 +127,7 @@ export function PermissionsTree({ permissions, rolePermissions, onPermissionsCha
         </div>
       </ScrollArea>
       <div className="mt-4 pt-4 border-t">
-        <Button onClick={handleSave} className="w-full" disabled={isSaving}>
+        <Button onClick={handleSave} className="w-full" disabled={isSaving || !rolePermissions}>
           <Save className="mr-2 h-4 w-4" />
           {isSaving ? 'Guardando...' : 'Guardar Permisos'}
         </Button>

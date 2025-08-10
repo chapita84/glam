@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import React, { useState } from "react"
@@ -54,8 +53,8 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshData
     }
   };
 
-  const handleAddNewRole = async () => {
-    if (newRoleName.trim() === "") return;
+  const handleAddNewRole = async (tenantId: string) => {
+    if (newRoleName.trim() === "" || !tenantId) return;
     const newRole = {
       id: newRoleName.toLowerCase().replace(/\s+/g, '_'),
       name: newRoleName,
@@ -104,7 +103,7 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshData
                             value={newRoleName}
                             onChange={(e) => setNewRoleName(e.target.value)}
                         />
-                        <Button onClick={handleAddNewRole}><PlusCircle className="mr-2"/> Añadir</Button>
+                        <Button onClick={() => handleAddNewRole(tenantId)}><PlusCircle className="mr-2"/> Añadir</Button>
                     </div>
                      <Table>
                         <TableHeader>
