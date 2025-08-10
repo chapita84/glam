@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { PlusCircle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { format, isSameDay, setHours, setMinutes, getDay, parse, addMinutes } from "date-fns"
+import { format, isSameDay, setHours, setMinutes, getDay, parse, addMinutes, startOfDay, endOfDay, eachHourOfInterval } from "date-fns"
 import { es } from "date-fns/locale"
 import { type Booking, type StaffMember, type Service, addOrUpdateBooking, type TenantConfig } from "@/lib/firebase/firestore"
 import { ScrollArea } from "./ui/scroll-area"
@@ -30,11 +30,13 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
   const [open, setOpen] = useState(false);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  const todaysAppointments = date 
-    ? bookings.filter(booking => isSameDay(booking.startTime, date)) 
-    : [];
-  
-  todaysAppointments.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  const todaysAppointments = useMemo(() => {
+    return date
+        ? bookings
+            .filter(booking => isSameDay(booking.startTime, date))
+            .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
+        : [];
+    }, [date, bookings]);
 
   const handleSaveBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -155,69 +157,51 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
     )
   }
 
-  const AvailableSlots = () => {
-    const timeSlotInterval = 30; // minutes
-    
-    const availableSlots = useMemo(() => {
-        if (!date || !config?.workingHours) return [];
-        
-        const dayOfWeek = getDay(date);
-        const workingDay = config.workingHours.find(d => d.dayOfWeek === dayOfWeek && d.enabled);
+  const DailyScheduleView = () => {
+    const dayOfWeek = date ? getDay(date) : -1;
+    const workingDay = config?.workingHours?.find(d => d.dayOfWeek === dayOfWeek && d.enabled);
 
-        if (!workingDay) return [];
-
-        const slots = [];
-        let currentTime = parse(workingDay.startTime, 'HH:mm', date);
-        const endTime = parse(workingDay.endTime, 'HH:mm', date);
-        
-        while(currentTime < endTime) {
-            const slotStartTime = new Date(currentTime);
-            const slotEndTime = addMinutes(slotStartTime, timeSlotInterval);
-
-            const isBooked = todaysAppointments.some(booking => {
-                const bookingStartTime = booking.startTime;
-                const bookingEndTime = addMinutes(bookingStartTime, booking.duration);
-                return (slotStartTime < bookingEndTime && slotEndTime > bookingStartTime);
-            });
-
-            if (!isBooked) {
-                slots.push(format(slotStartTime, 'HH:mm'));
-            }
-
-            currentTime = addMinutes(currentTime, timeSlotInterval);
-        }
-
-        return slots;
-
-    }, [date, config?.workingHours, todaysAppointments]);
-
-
-    if (!date) return null;
-
-    const dayOfWeek = getDay(date);
-    const isWorkingDay = config?.workingHours?.some(d => d.dayOfWeek === dayOfWeek && d.enabled);
-
-    if (!isWorkingDay) {
-         return (
-            <div className="text-center text-muted-foreground py-10">
-                <p>El estudio está cerrado este día.</p>
-            </div>
-        )
+    if (!date || !workingDay) {
+      return (
+        <div className="h-[600px] flex items-center justify-center text-muted-foreground">
+          <p>El estudio está cerrado este día.</p>
+        </div>
+      );
     }
+    
+    const dayStart = parse(workingDay.startTime, 'HH:mm', date);
+    const dayEnd = parse(workingDay.endTime, 'HH:mm', date);
+    const hours = eachHourOfInterval({ start: dayStart, end: dayEnd });
+    
+    const totalMinutes = (dayEnd.getTime() - dayStart.getTime()) / 60000;
 
     return (
-      <div className="grid grid-cols-4 gap-2">
-        {availableSlots.length > 0 ? (
-          availableSlots.map(slot => (
-            <Button key={slot} variant="outline" onClick={() => handleOpenDialog(slot)}>
-              {slot}
-            </Button>
-          ))
-        ) : (
-          <div className="col-span-4 text-center text-muted-foreground py-10">
-            <p>No hay horarios disponibles.</p>
+      <div className="relative">
+        {hours.map((hour, index) => (
+          <div key={index} className="relative flex h-24 border-t border-muted/50">
+            <div className="w-16 text-xs text-right pr-2 pt-1 text-muted-foreground">
+              {format(hour, 'p', { locale: es })}
+            </div>
+            <div className="flex-1 border-l border-muted/50" />
           </div>
-        )}
+        ))}
+
+        {todaysAppointments.map(app => {
+          const top = (app.startTime.getTime() - dayStart.getTime()) / 60000 / totalMinutes * 100;
+          const height = app.duration / totalMinutes * 100;
+          
+          return (
+            <div 
+              key={app.id} 
+              className="absolute left-16 right-0 p-2 rounded-lg bg-primary/20 border border-primary/50 text-primary-foreground"
+              style={{ top: `${top}%`, height: `${height}%` }}
+            >
+              <p className="font-semibold text-xs text-primary">{app.serviceName}</p>
+              <p className="text-xs text-primary/80">{app.clientName}</p>
+              <p className="text-xs text-primary/60">con {app.staffName}</p>
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -233,35 +217,12 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
                             <PlusCircle className="h-5 w-5"/>
                         </Button>
                     </CardTitle>
-                    <CardDescription>Citas existentes y horarios disponibles.</CardDescription>
+                    <CardDescription>Citas programadas para el día seleccionado.</CardDescription>
                 </CardHeader>
-                 <ScrollArea className="h-[600px]">
-                <CardContent className="space-y-4 p-4">
-                   <h3 className="font-semibold text-lg">Citas Programadas</h3>
-                    {todaysAppointments.length > 0 ? (
-                        todaysAppointments.map(app => (
-                            <div key={app.id} className="flex items-start gap-4 p-3 rounded-lg bg-secondary/50">
-                                <Avatar className="h-10 w-10 border">
-                                  <AvatarImage src={`https://placehold.co/40x40.png?text=${app.clientName.charAt(0)}`} alt="Avatar" data-ai-hint="foto de perfil" />
-                                  <AvatarFallback>{app.clientName.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                    <p className="font-semibold">{app.serviceName}</p>
-                                    <p className="text-sm text-muted-foreground">{app.clientName}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">con {app.staffName}</p>
-                                </div>
-                                <div className="text-sm font-medium">{format(app.startTime, 'p', { locale: es })}</div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-center text-muted-foreground py-10">
-                            <p>No hay citas programadas para este día.</p>
-                        </div>
-                    )}
-
-                    <h3 className="font-semibold text-lg pt-4">Horarios Disponibles</h3>
-                    <AvailableSlots />
-                </CardContent>
+                <ScrollArea className="h-[600px]">
+                  <CardContent className="p-4">
+                    <DailyScheduleView />
+                  </CardContent>
                 </ScrollArea>
             </Card>
             {open && <NewBookingForm />}
@@ -303,3 +264,5 @@ export function AppointmentsCalendar({ bookings, staff, services, config, tenant
     </div>
   )
 }
+
+    
