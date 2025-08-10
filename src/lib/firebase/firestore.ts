@@ -2,6 +2,7 @@
 
 
 
+
 import { db } from './config';
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import type { Role } from '@/app/(app)/layout';
@@ -20,7 +21,7 @@ export type StaffMember = {
   name: string;
   email: string;
   roleId: string;
-  avatar: string; // Will be generated from name for now
+  avatar?: string;
   joinedAt?: any; 
 };
 
@@ -164,7 +165,11 @@ export async function updateTenantConfig(tenantId: string, config: TenantConfig)
         // Ensure we are saving into the nested 'config' object
         const configToSave = {
             ...config,
-            workingHours: [...config.workingHours].sort((a,b) => a.dayOfWeek - b.dayOfWeek)
+            workingHours: [...config.workingHours].sort((a,b) => {
+                const dayA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
+                const dayB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
+                return dayA - dayB;
+            })
         };
         await setDoc(configDocRef, { config: configToSave }, { merge: true });
         console.log("Tenant config updated successfully.");
