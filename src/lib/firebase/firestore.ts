@@ -1,3 +1,4 @@
+
 import { db } from './config';
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import type { Role, Permission } from '@/app/(app)/layout';
@@ -342,6 +343,7 @@ export async function getServices(tenantId: string): Promise<Service[]> {
             const defaultServices: Service[] = [
                 { id: 'corte-de-pelo', name: 'Corte de Cabello', category: 'Peluquería', duration: 60, price: 50 },
                 { id: 'manicura-clasica', name: 'Manicura Clásica', category: 'Uñas', duration: 30, price: 25 },
+                { id: 'maquillaje', name: 'Maquillaje', category: 'Maquillaje', duration: 90, price: 75 },
             ];
             for (const service of defaultServices) {
                 await addOrUpdateService(tenantId, service);
@@ -573,5 +575,7 @@ export async function deleteBudget(tenantId: string, budgetId: string): Promise<
         console.error("Error deleting budget: ", error);
     }
 }
+
+    
 
     
