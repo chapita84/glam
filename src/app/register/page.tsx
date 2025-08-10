@@ -17,6 +17,9 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Terminal, CheckCircle, Loader2, Fingerprint } from "lucide-react"
+import { redirect } from 'next/navigation'
+import { useEffect } from 'react'
+
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -51,6 +54,13 @@ export default function RegisterPage() {
         message: "",
     });
 
+    useEffect(() => {
+        if (state.message === 'success') {
+            redirect('/onboarding/create-studio');
+        }
+    }, [state.message]);
+
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-4">
@@ -67,49 +77,39 @@ export default function RegisterPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {state.message === 'success' ? (
-                <Alert>
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>¡Registro Exitoso!</AlertTitle>
-                    <AlertDescription>
-                        Tu cuenta ha sido creada. Ahora puedes <Link href="/login" className="font-bold underline">iniciar sesión</Link>.
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <form action={formAction} className="grid gap-4">
-                    {state.message && state.message !== 'success' && (
-                        <Alert variant="destructive">
-                            <Terminal className="h-4 w-4" />
-                            <AlertTitle>Error de Registro</AlertTitle>
-                            <AlertDescription>
-                                {state.message}
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    <div className="grid gap-2">
-                        <Label htmlFor="fullName">Nombre Completo</Label>
-                        <Input id="fullName" name="fullName" placeholder="Tu Nombre" required />
-                        {state.errors?.fullName && <p className="text-sm font-medium text-destructive">{state.errors.fullName[0]}</p>}
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="email">Correo Electrónico</Label>
-                        <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="nombre@ejemplo.com"
-                        required
-                        />
-                         {state.errors?.email && <p className="text-sm font-medium text-destructive">{state.errors.email[0]}</p>}
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="password">Contraseña</Label>
-                        <Input id="password" name="password" type="password" required />
-                        {state.errors?.password && <p className="text-sm font-medium text-destructive">{state.errors.password[0]}</p>}
-                    </div>
-                    <SubmitButton />
-                </form>
-            )}
+            <form action={formAction} className="grid gap-4">
+                {state.message && state.message !== 'success' && (
+                    <Alert variant="destructive">
+                        <Terminal className="h-4 w-4" />
+                        <AlertTitle>Error de Registro</AlertTitle>
+                        <AlertDescription>
+                            {state.message}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                <div className="grid gap-2">
+                    <Label htmlFor="fullName">Nombre Completo</Label>
+                    <Input id="fullName" name="fullName" placeholder="Tu Nombre" required />
+                    {state.errors?.fullName && <p className="text-sm font-medium text-destructive">{state.errors.fullName[0]}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="email">Correo Electrónico</Label>
+                    <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="nombre@ejemplo.com"
+                    required
+                    />
+                     {state.errors?.email && <p className="text-sm font-medium text-destructive">{state.errors.email[0]}</p>}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="password">Contraseña</Label>
+                    <Input id="password" name="password" type="password" required />
+                    {state.errors?.password && <p className="text-sm font-medium text-destructive">{state.errors.password[0]}</p>}
+                </div>
+                <SubmitButton />
+            </form>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
