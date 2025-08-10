@@ -2,7 +2,7 @@
 'use client'
 
 import type { PropsWithChildren } from 'react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getRoles, getStaff, getServices, getBookings, type StaffMember, type Service, type Booking } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -79,7 +79,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
   // Using a mock tenantId for now
   const tenantId = "test-tenant";
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setLoading(true);
     const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings] = await Promise.all([
       getRoles(tenantId),
@@ -92,11 +92,11 @@ export default function AppLayout({ children }: PropsWithChildren) {
     setServices(fetchedServices);
     setBookings(fetchedBookings);
     setLoading(false);
-  };
+  }, [tenantId]);
   
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
   
   const childrenWithProps = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
