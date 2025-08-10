@@ -1,6 +1,7 @@
 
 
 
+
 import { db } from './config';
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import type { Role } from '@/app/(app)/layout';
@@ -115,6 +116,16 @@ export type TenantConfig = {
     workingHours: WorkingHour[];
 }
 
+const defaultWorkingHours: WorkingHour[] = [
+    { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', enabled: true },
+    { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', enabled: true },
+    { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', enabled: true },
+    { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', enabled: true },
+    { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', enabled: true },
+    { dayOfWeek: 6, startTime: '09:00', endTime: '14:00', enabled: false },
+    { dayOfWeek: 0, startTime: '09:00', endTime: '14:00', enabled: false },
+].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+
 /**
  * Fetches the configuration for a given tenant from Firestore.
  * @param tenantId The ID of the tenant.
@@ -126,36 +137,19 @@ export async function getTenantConfig(tenantId: string): Promise<TenantConfig | 
         const docSnap = await getDoc(configDocRef);
         if (docSnap.exists()) {
             const data = docSnap.data();
-            // Provide default working hours if they don't exist
-            const workingHours = data.config?.workingHours ?? [
-                { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', enabled: true },
-                { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', enabled: true },
-                { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', enabled: true },
-                { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', enabled: true },
-                { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', enabled: true },
-                { dayOfWeek: 6, startTime: '09:00', endTime: '14:00', enabled: false },
-                { dayOfWeek: 0, startTime: '09:00', endTime: '14:00', enabled: false },
-            ];
-            return {
-                workingHours: workingHours.sort((a: WorkingHour, b: WorkingHour) => a.dayOfWeek - b.dayOfWeek),
-            };
-        } else {
-             // Provide default working hours if the document doesn't exist
-            return {
-                workingHours: [
-                    { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', enabled: true },
-                    { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', enabled: true },
-                    { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', enabled: true },
-                    { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', enabled: true },
-                    { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', enabled: true },
-                    { dayOfWeek: 6, startTime: '09:00', endTime: '14:00', enabled: false },
-                    { dayOfWeek: 0, startTime: '09:00', endTime: '14:00', enabled: false },
-                ].sort((a: WorkingHour, b: WorkingHour) => a.dayOfWeek - b.dayOfWeek),
-            };
+            // Correctly access nested config object
+            const workingHours = data.config?.workingHours;
+            if (workingHours) {
+                return {
+                    workingHours: workingHours.sort((a: WorkingHour, b: WorkingHour) => a.dayOfWeek - b.dayOfWeek),
+                };
+            }
         }
+        // If doc doesn't exist or has no config, return defaults
+        return { workingHours: defaultWorkingHours };
     } catch (error) {
         console.error("Error fetching tenant config: ", error);
-        return null;
+        return { workingHours: defaultWorkingHours };
     }
 }
 
@@ -167,7 +161,12 @@ export async function getTenantConfig(tenantId: string): Promise<TenantConfig | 
 export async function updateTenantConfig(tenantId: string, config: TenantConfig): Promise<void> {
     const configDocRef = doc(db, 'tenants', tenantId);
     try {
-        await setDoc(configDocRef, { config }, { merge: true });
+        // Ensure we are saving into the nested 'config' object
+        const configToSave = {
+            ...config,
+            workingHours: [...config.workingHours].sort((a,b) => a.dayOfWeek - b.dayOfWeek)
+        };
+        await setDoc(configDocRef, { config: configToSave }, { merge: true });
         console.log("Tenant config updated successfully.");
     } catch (error) {
         console.error("Error updating tenant config: ", error);
