@@ -1,6 +1,6 @@
 
 import { db } from './config';
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import type { Role } from '@/app/(app)/layout';
 
 // Type for role data stored in Firestore
@@ -19,6 +19,40 @@ export type StaffMember = {
   joinedAt?: any; 
 };
 
+export type Service = {
+  id: string;
+  name: string;
+  category: string;
+  duration: number; // in minutes
+  price: number;
+}
+
+export type Client = {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+}
+
+export type Booking = {
+    id: string; // bookingId
+    clientId: string;
+    clientName: string;
+    staffId: string;
+    staffName: string;
+    serviceId: string;
+    serviceName: string;
+    duration: number; // in minutes
+    startTime: Date;
+    endTime: Date;
+    status: 'confirmed' | 'completed' | 'canceled_by_user' | 'canceled_by_tenant' | 'no_show';
+    price: {
+        amount: number;
+        currency: string;
+    };
+    createdAt: any;
+    notes?: string;
+}
 
 /**
  * Fetches all roles for a given tenant from Firestore.
@@ -123,5 +157,69 @@ export async function deleteStaffMember(tenantId: string, userId: string): Promi
         console.log("Staff member deleted successfully: ", userId);
     } catch (error) {
         console.error("Error deleting staff member: ", error);
+    }
+}
+
+
+/**
+ * Fetches all bookings for a given tenant from Firestore.
+ * @param tenantId The ID of the tenant.
+ * @returns A promise that resolves to an array of Booking objects.
+ */
+export async function getBookings(tenantId: string): Promise<Booking[]> {
+    const bookingsCollectionRef = collection(db, 'tenants', tenantId, 'bookings');
+    try {
+        const querySnapshot = await getDocs(bookingsCollectionRef);
+        const bookings = querySnapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+                ...data,
+                id: doc.id,
+                startTime: data.startTime.toDate(),
+                endTime: data.endTime.toDate(),
+            } as Booking;
+        });
+        return bookings;
+    } catch (error) {
+        console.error("Error fetching bookings: ", error);
+        return [];
+    }
+}
+
+/**
+ * Adds a new booking or updates an existing one in Firestore.
+ * @param tenantId The ID of the tenant.
+ * @param booking The booking object to add or update.
+ */
+export async function addOrUpdateBooking(tenantId: string, booking: Omit<Booking, 'id' | 'createdAt'> & { id?: string }): Promise<void> {
+    const bookingId = booking.id || doc(collection(db, 'tenants', tenantId, 'bookings')).id;
+    const bookingDocRef = doc(db, 'tenants', tenantId, 'bookings', bookingId);
+    
+    const bookingData = {
+        ...booking,
+        createdAt: serverTimestamp(),
+    };
+    delete bookingData.id;
+
+    try {
+        await setDoc(bookingDocRef, bookingData, { merge: true });
+        console.log("Booking saved successfully: ", bookingId);
+    } catch (error) {
+        console.error("Error saving booking: ", error);
+    }
+}
+
+/**
+ * Deletes a booking from Firestore.
+ * @param tenantId The ID of the tenant.
+ * @param bookingId The ID of the booking to delete.
+ */
+export async function deleteBooking(tenantId: string, bookingId: string): Promise<void> {
+    const bookingDocRef = doc(db, 'tenants', tenantId, 'bookings', bookingId);
+    try {
+        await deleteDoc(bookingDocRef);
+        console.log("Booking deleted successfully: ", bookingId);
+    } catch (error) {
+        console.error("Error deleting booking: ", error);
     }
 }
