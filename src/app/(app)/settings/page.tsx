@@ -34,7 +34,7 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
   const { toast } = useToast();
 
   useEffect(() => {
-    // Sync local state when props change
+    // Sincronizar el estado local cuando las props cambian (después de la carga inicial o refresco)
     if (initialConfig) {
       setConfig(initialConfig);
     }
@@ -47,7 +47,7 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
       const newWorkingHours = prevConfig.workingHours ? [...prevConfig.workingHours] : [];
       let dayFound = false;
 
-      // Find and update the day
+      // Buscar y actualizar el día
       const updatedHours = newWorkingHours.map(d => {
         if (d.dayOfWeek === dayId) {
           dayFound = true;
@@ -56,11 +56,13 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
         return d;
       });
 
-      // If the day was not found, add it
+      // Si el día no se encontró, añadirlo
       if (!dayFound) {
         const defaultDay = { dayOfWeek: dayId, startTime: "09:00", endTime: "18:00", enabled: false };
         updatedHours.push({ ...defaultDay, [field]: value });
       }
+      
+      updatedHours.sort((a,b) => a.dayOfWeek - b.dayOfWeek);
 
       return { ...prevConfig, workingHours: updatedHours };
     });
@@ -73,7 +75,7 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
       }
       setIsSaving(true);
       try {
-          // We need to ensure workingHours is sorted before saving
+          // El ordenamiento ya se hace en handleWorkingHoursChange, pero lo aseguramos aquí.
           const configToSave = {
               ...config,
               workingHours: [...config.workingHours].sort((a,b) => a.dayOfWeek - b.dayOfWeek)
