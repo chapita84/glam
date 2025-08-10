@@ -73,7 +73,7 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
   };
 
   if (initialLoading || !config) {
-    return <p>Cargando configuración...</p>;
+    return <div className="flex h-full w-full items-center justify-center"><p>Cargando configuración...</p></div>;
   }
 
   return (

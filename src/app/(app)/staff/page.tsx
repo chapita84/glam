@@ -92,7 +92,7 @@ export default function StaffPage({ roles = [], staff = [], refreshData, loading
   }
   
   if (loading) {
-    return <p>Cargando equipo...</p>;
+    return <div className="flex h-full w-full items-center justify-center"><p>Cargando equipo...</p></div>;
   }
 
   return (

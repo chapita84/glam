@@ -86,7 +86,7 @@ export default function ServicesPage({ services = [], tenantId, refreshData, loa
   };
 
   if (loading) {
-    return <p>Cargando servicios...</p>
+    return <div className="flex h-full w-full items-center justify-center"><p>Cargando servicios...</p></div>
   }
 
 

@@ -97,21 +97,27 @@ export default function AppLayout({ children }: PropsWithChildren) {
 
   const refreshData = useCallback(async () => {
     setLoading(true);
-    const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings, fetchedConfig, fetchedBudgets] = await Promise.all([
-      getRoles(tenantId),
-      getStaff(tenantId),
-      getServices(tenantId),
-      getBookings(tenantId),
-      getTenantConfig(tenantId),
-      getBudgets(tenantId),
-    ]);
-    setRoles(fetchedRoles);
-    setStaff(fetchedStaff);
-    setServices(fetchedServices);
-    setBookings(fetchedBookings);
-    setConfig(fetchedConfig);
-    setBudgets(fetchedBudgets);
-    setLoading(false);
+    try {
+        const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings, fetchedConfig, fetchedBudgets] = await Promise.all([
+        getRoles(tenantId),
+        getStaff(tenantId),
+        getServices(tenantId),
+        getBookings(tenantId),
+        getTenantConfig(tenantId),
+        getBudgets(tenantId),
+        ]);
+        setRoles(fetchedRoles);
+        setStaff(fetchedStaff);
+        setServices(fetchedServices);
+        setBookings(fetchedBookings);
+        setConfig(fetchedConfig);
+        setBudgets(fetchedBudgets);
+    } catch (error) {
+        console.error("Failed to fetch initial data:", error);
+        // Optionally, set an error state to show a message to the user
+    } finally {
+        setLoading(false);
+    }
   }, [tenantId]);
   
   useEffect(() => {
@@ -236,7 +242,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className={`flex-1 ${mainContentPadding}`}>{loading ? <p>Cargando datos...</p> : childrenWithProps}</main>
+        <main className={`flex-1 ${mainContentPadding}`}>{loading ? <div className="flex h-full w-full items-center justify-center"><p>Cargando datos...</p></div> : childrenWithProps}</main>
       </SidebarInset>
     </SidebarProvider>
   );

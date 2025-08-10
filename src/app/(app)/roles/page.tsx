@@ -93,7 +93,7 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshData
   };
 
   if (loading) {
-    return <p>Cargando roles...</p>;
+    return <div className="flex h-full w-full items-center justify-center"><p>Cargando roles...</p></div>;
   }
 
   return (
