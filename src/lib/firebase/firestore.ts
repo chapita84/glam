@@ -160,6 +160,46 @@ export async function deleteStaffMember(tenantId: string, userId: string): Promi
     }
 }
 
+/**
+ * Fetches all services for a given tenant from Firestore.
+ */
+export async function getServices(tenantId: string): Promise<Service[]> {
+    const servicesCollectionRef = collection(db, 'tenants', tenantId, 'services');
+    try {
+        const querySnapshot = await getDocs(servicesCollectionRef);
+        return querySnapshot.docs.map(doc => doc.data() as Service);
+    } catch (error) {
+        console.error("Error fetching services: ", error);
+        return [];
+    }
+}
+
+/**
+ * Adds or updates a service in Firestore.
+ */
+export async function addOrUpdateService(tenantId: string, service: Service): Promise<void> {
+    const serviceDocRef = doc(db, 'tenants', tenantId, 'services', service.id);
+    try {
+        await setDoc(serviceDocRef, service, { merge: true });
+        console.log("Service saved successfully: ", service.id);
+    } catch (error) {
+        console.error("Error saving service: ", error);
+    }
+}
+
+/**
+ * Deletes a service from Firestore.
+ */
+export async function deleteService(tenantId: string, serviceId: string): Promise<void> {
+    const serviceDocRef = doc(db, 'tenants', tenantId, 'services', serviceId);
+    try {
+        await deleteDoc(serviceDocRef);
+        console.log("Service deleted successfully: ", serviceId);
+    } catch (error) {
+        console.error("Error deleting service: ", error);
+    }
+}
+
 
 /**
  * Fetches all bookings for a given tenant from Firestore.
@@ -172,11 +212,13 @@ export async function getBookings(tenantId: string): Promise<Booking[]> {
         const querySnapshot = await getDocs(bookingsCollectionRef);
         const bookings = querySnapshot.docs.map((doc) => {
             const data = doc.data();
+            const startTime = data.startTime.toDate();
+            const endTime = new Date(startTime.getTime() + data.duration * 60000);
             return {
                 ...data,
                 id: doc.id,
-                startTime: data.startTime.toDate(),
-                endTime: data.endTime.toDate(),
+                startTime: startTime,
+                endTime: endTime,
             } as Booking;
         });
         return bookings;
@@ -191,19 +233,21 @@ export async function getBookings(tenantId: string): Promise<Booking[]> {
  * @param tenantId The ID of the tenant.
  * @param booking The booking object to add or update.
  */
-export async function addOrUpdateBooking(tenantId: string, booking: Omit<Booking, 'id' | 'createdAt'> & { id?: string }): Promise<void> {
-    const bookingId = booking.id || doc(collection(db, 'tenants', tenantId, 'bookings')).id;
-    const bookingDocRef = doc(db, 'tenants', tenantId, 'bookings', bookingId);
+export async function addOrUpdateBooking(tenantId: string, booking: Omit<Booking, 'id' | 'createdAt' | 'endTime'> & { id?: string }): Promise<void> {
+    // If no id is provided, a new one will be generated automatically by Firestore
+    const bookingDocRef = booking.id 
+        ? doc(db, 'tenants', tenantId, 'bookings', booking.id)
+        : doc(collection(db, 'tenants', tenantId, 'bookings'));
     
     const bookingData = {
         ...booking,
+        id: bookingDocRef.id,
         createdAt: serverTimestamp(),
     };
-    delete bookingData.id;
 
     try {
         await setDoc(bookingDocRef, bookingData, { merge: true });
-        console.log("Booking saved successfully: ", bookingId);
+        console.log("Booking saved successfully: ", bookingDocRef.id);
     } catch (error) {
         console.error("Error saving booking: ", error);
     }

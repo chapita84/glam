@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -38,57 +38,44 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { addOrUpdateService, deleteService, type Service } from "@/lib/firebase/firestore"
 
-type Service = {
-  id: number;
-  name: string;
-  category: string;
-  duration: string;
-  price: string;
+interface ServicesPageProps {
+  services: Service[];
+  tenantId: string;
+  refreshData: () => void;
+  loading: boolean;
 }
 
-const initialServices: Service[] = [
-  { id: 1, name: "Maquillaje de Novia", category: "Maquillaje", duration: "120 min", price: "$250.00" },
-  { id: 2, name: "Peluquería", category: "Cabello", duration: "60 min", price: "$80.00" },
-  { id: 3, name: "Manicura de Lujo", category: "Uñas", duration: "45 min", price: "$50.00" },
-  { id: 4, name: "Pedicura de Lujo", category: "Uñas", duration: "60 min", price: "$75.00" },
-  { id: 5, name: "Masaje de Tejido Profundo", category: "Bienestar", duration: "90 min", price: "$150.00" },
-  { id: 6, name: "Facial Insignia", category: "Cuidado de la piel", duration: "75 min", price: "$130.00" },
-  { id: 7, name: "Depilación Corporal Completa", category: "Depilación", duration: "60 min", price: "$100.00" },
-];
-
-export default function ServicesPage() {
+export default function ServicesPage({ services: initialServices = [], tenantId, refreshData, loading }: ServicesPageProps) {
   const [services, setServices] = useState<Service[]>(initialServices);
   const [open, setOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
 
-  const handleSaveService = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    setServices(initialServices);
+  }, [initialServices]);
+
+  const handleSaveService = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    
     const serviceData = {
         name: formData.get('name') as string,
         category: formData.get('category') as string,
-        duration: formData.get('duration') as string,
-        price: formData.get('price') as string,
+        duration: parseInt(formData.get('duration') as string, 10),
+        price: parseFloat(formData.get('price') as string),
     };
 
-    if (editingService) {
-        // Update existing service
-        setServices(services.map(s => s.id === editingService.id ? { ...s, ...serviceData } : s));
-    } else {
-        // Add new service
-        const newId = services.length > 0 ? Math.max(...services.map(s => s.id)) + 1 : 1;
-        setServices([...services, { id: newId, ...serviceData }]);
+    if (serviceData.name && serviceData.category && !isNaN(serviceData.duration) && !isNaN(serviceData.price)) {
+        const id = editingService?.id || serviceData.name.toLowerCase().replace(/\s+/g, '_');
+        await addOrUpdateService(tenantId, { id, ...serviceData });
+        
+        setOpen(false);
+        setEditingService(null);
+        await refreshData();
     }
-
-    setOpen(false);
-    setEditingService(null);
-  };
-
-  const handleEdit = (service: Service) => {
-    setEditingService(service);
-    setOpen(true);
   };
   
   const handleOpenDialog = (service: Service | null) => {
@@ -96,9 +83,16 @@ export default function ServicesPage() {
     setOpen(true);
   }
 
-  const handleDelete = (id: number) => {
-    setServices(services.filter(s => s.id !== id));
+  const handleDelete = async (id: string) => {
+    if (confirm('¿Estás seguro de que quieres eliminar este servicio?')) {
+        await deleteService(tenantId, id);
+        await refreshData();
+    }
   };
+
+  if (loading) {
+    return <p>Cargando servicios...</p>
+  }
 
 
   return (
@@ -123,19 +117,19 @@ export default function ServicesPage() {
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nombre</Label>
-                                <Input id="name" name="name" defaultValue={editingService?.name} placeholder="p. ej. Maquillaje de Novia" className="col-span-3" required/>
+                                <Input id="name" name="name" defaultValue={editingService?.name} placeholder="p. ej. Maquillaje de Novia" className="col-span-3" required disabled={!!editingService}/>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Categoría</Label>
                                 <Input id="category" name="category" defaultValue={editingService?.category} placeholder="p. ej. Maquillaje" className="col-span-3" required/>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="duration" className="text-right">Duración</Label>
-                                <Input id="duration" name="duration" defaultValue={editingService?.duration} placeholder="p. ej. 120 min" className="col-span-3" required/>
+                                <Label htmlFor="duration" className="text-right">Duración (min)</Label>
+                                <Input id="duration" name="duration" type="number" defaultValue={editingService?.duration} placeholder="p. ej. 120" className="col-span-3" required/>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="price" className="text-right">Precio</Label>
-                                <Input id="price" name="price" defaultValue={editingService?.price} placeholder="p. ej. $250.00" className="col-span-3" required/>
+                                <Label htmlFor="price" className="text-right">Precio ($)</Label>
+                                <Input id="price" name="price" type="number" step="0.01" defaultValue={editingService?.price} placeholder="p. ej. 250.00" className="col-span-3" required/>
                             </div>
                         </div>
                         <DialogFooter>
@@ -172,8 +166,8 @@ export default function ServicesPage() {
                   <TableCell>
                     <Badge variant="outline">{service.category}</Badge>
                   </TableCell>
-                  <TableCell>{service.duration}</TableCell>
-                  <TableCell>{service.price}</TableCell>
+                  <TableCell>{service.duration} min</TableCell>
+                  <TableCell>${service.price.toFixed(2)}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -184,7 +178,7 @@ export default function ServicesPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEdit(service)}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenDialog(service)}>Editar</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(service.id)}>Eliminar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -198,5 +192,3 @@ export default function ServicesPage() {
     </div>
   )
 }
-
-    

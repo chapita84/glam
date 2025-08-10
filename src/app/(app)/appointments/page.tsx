@@ -2,26 +2,36 @@
 'use client'
 
 import { AppointmentsCalendar } from "@/components/appointments-calendar";
-import { getBookings, type Booking } from "@/lib/firebase/firestore";
+import { getBookings, type Booking, type Service, type StaffMember } from "@/lib/firebase/firestore";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function AppointmentsPage() {
+interface AppointmentsPageProps {
+  staff: StaffMember[];
+  services: Service[];
+  tenantId: string;
+  refreshData: () => void;
+}
+
+export default function AppointmentsPage({ staff, services, tenantId, refreshData }: AppointmentsPageProps) {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     
-    // Using a mock tenantId for now
-    const tenantId = "test-tenant";
+    const fetchBookings = async () => {
+        setLoading(true);
+        const fetchedBookings = await getBookings(tenantId);
+        setBookings(fetchedBookings);
+        setLoading(false);
+    };
 
     useEffect(() => {
-        const fetchBookings = async () => {
-            setLoading(true);
-            const fetchedBookings = await getBookings(tenantId);
-            setBookings(fetchedBookings);
-            setLoading(false);
-        };
         fetchBookings();
-    }, []);
+    }, [tenantId]);
+
+    const handleBookingCreated = () => {
+        fetchBookings(); // Refresca las reservas cuando se crea una nueva
+        refreshData(); // Llama a la función global de refresco si es necesario
+    };
 
 
     return (
@@ -37,7 +47,13 @@ export default function AppointmentsPage() {
                     </div>
                 </div>
             ) : (
-                <AppointmentsCalendar bookings={bookings} />
+                <AppointmentsCalendar 
+                    bookings={bookings} 
+                    staff={staff}
+                    services={services}
+                    tenantId={tenantId}
+                    onBookingCreated={handleBookingCreated}
+                />
             )}
         </div>
     );

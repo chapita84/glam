@@ -3,7 +3,7 @@
 
 import type { PropsWithChildren } from 'react';
 import React, { useState, useEffect } from 'react';
-import { getRoles, getStaff, type StaffMember } from '@/lib/firebase/firestore';
+import { getRoles, getStaff, getServices, type StaffMember, type Service } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,11 +31,11 @@ import {
   Calendar,
   Sparkles,
   Users,
+  Fingerprint,
   Wand2,
   LogOut,
   CircleUser,
   Settings,
-  Fingerprint,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -72,6 +72,7 @@ const allPermissions: Permission[] = [
 export default function AppLayout({ children }: PropsWithChildren) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Using a mock tenantId for now
@@ -79,12 +80,14 @@ export default function AppLayout({ children }: PropsWithChildren) {
 
   const refreshData = async () => {
     setLoading(true);
-    const [fetchedRoles, fetchedStaff] = await Promise.all([
+    const [fetchedRoles, fetchedStaff, fetchedServices] = await Promise.all([
       getRoles(tenantId),
-      getStaff(tenantId)
+      getStaff(tenantId),
+      getServices(tenantId)
     ]);
     setRoles(fetchedRoles);
     setStaff(fetchedStaff);
+    setServices(fetchedServices);
     setLoading(false);
   };
   
@@ -98,6 +101,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
       return React.cloneElement(child, { 
           roles, 
           staff,
+          services,
           allPermissions, 
           refreshData, 
           loading,
