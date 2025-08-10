@@ -60,8 +60,13 @@ export default function StaffPage({ roles = [], staff = [], refreshData, loading
     setOpen(true);
   };
   
-  const handleSaveMember = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveMember = async (event: React.FormEvent<HTMLFormElement>, tenantId: string) => {
     event.preventDefault();
+    if (!tenantId) {
+      console.error("Tenant ID is missing.");
+      // Optionally show an error to the user
+      return;
+    }
     const form = event.currentTarget;
     const formData = new FormData(form);
     const email = formData.get('email') as string;
@@ -112,7 +117,7 @@ export default function StaffPage({ roles = [], staff = [], refreshData, loading
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
-                    <form onSubmit={handleSaveMember}>
+                    <form onSubmit={(e) => handleSaveMember(e, tenantId)}>
                         <DialogHeader>
                             <DialogTitle>{editingMember ? 'Editar Miembro' : 'Invitar Nuevo Miembro'}</DialogTitle>
                             <DialogDescription>

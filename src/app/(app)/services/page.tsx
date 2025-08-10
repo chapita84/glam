@@ -51,8 +51,13 @@ export default function ServicesPage({ services = [], tenantId, refreshData, loa
   const [open, setOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
 
-  const handleSaveService = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveService = async (event: React.FormEvent<HTMLFormElement>, tenantId: string) => {
     event.preventDefault();
+    if (!tenantId) {
+      console.error("Tenant ID is missing.");
+      // Optionally show an error to the user
+      return;
+    }
     const form = event.currentTarget;
     const formData = new FormData(form);
     
@@ -102,7 +107,7 @@ export default function ServicesPage({ services = [], tenantId, refreshData, loa
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
-                    <form onSubmit={handleSaveService}>
+                    <form onSubmit={(e) => handleSaveService(e, tenantId)}>
                         <DialogHeader>
                             <DialogTitle>{editingService ? "Editar Servicio" : "Añadir Nuevo Servicio"}</DialogTitle>
                             <DialogDescription>

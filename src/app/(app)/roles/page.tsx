@@ -59,8 +59,13 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshData
     setOpen(true);
   };
 
-  const handleSaveRole = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveRole = async (event: React.FormEvent<HTMLFormElement>, tenantId: string) => {
     event.preventDefault();
+    if (!tenantId) {
+      console.error("Tenant ID is missing.");
+      // Optionally show an error to the user
+      return;
+    }
     const form = event.currentTarget;
     const roleName = (form.elements.namedItem('role-name') as HTMLInputElement).value;
     const selectedPermissions = new Set(
@@ -113,7 +118,7 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshData
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
-                    <form onSubmit={handleSaveRole}>
+                    <form onSubmit={(e) => handleSaveRole(e, tenantId)}>
                         <DialogHeader>
                             <DialogTitle>{editingRole ? "Editar Rol" : "Crear Nuevo Rol"}</DialogTitle>
                             <DialogDescription>
