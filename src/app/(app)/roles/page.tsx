@@ -45,11 +45,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 interface RolesPageProps {
   roles: Role[];
   allPermissions: Permission[];
-  refreshRoles: () => void;
+  refreshData: () => void;
   loading: boolean;
+  tenantId: string;
 }
 
-export default function RolesPage({ roles = [], allPermissions = [], refreshRoles, loading }: RolesPageProps) {
+export default function RolesPage({ roles = [], allPermissions = [], refreshData, loading, tenantId }: RolesPageProps) {
   const [open, setOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
@@ -63,13 +64,12 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshRole
     const form = event.currentTarget;
     const roleName = (form.elements.namedItem('role-name') as HTMLInputElement).value;
     const selectedPermissions = new Set(
-        allPermissions
+        (allPermissions || [])
             .filter(p => (form.elements.namedItem(`perm-${p.id}`) as HTMLInputElement).checked)
             .map(p => p.id)
     );
 
     if (roleName) {
-        const tenantId = "test-tenant";
         const roleId = editingRole?.id || roleName.toLowerCase().replace(/\s+/g, '_');
         const roleData = { 
             id: roleId, 
@@ -81,15 +81,14 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshRole
         
         setOpen(false);
         setEditingRole(null);
-        await refreshRoles(); // Refresh data from Firestore
+        await refreshData(); // Refresh data from Firestore
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
       if (confirm('¿Estás seguro de que quieres eliminar este rol?')) {
-          const tenantId = "test-tenant";
           await deleteRole(tenantId, roleId);
-          await refreshRoles(); // Refresh data from Firestore
+          await refreshData(); // Refresh data from Firestore
       }
   };
 
@@ -129,7 +128,7 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshRole
                             <div className="space-y-2">
                                 <Label>Permisos</Label>
                                 <div className="grid gap-2">
-                                    {allPermissions.map(p => (
+                                    {(allPermissions || []).map(p => (
                                         <div key={p.id} className="flex items-center gap-2">
                                             <Checkbox 
                                                 id={`perm-${p.id}`} 
@@ -168,11 +167,11 @@ export default function RolesPage({ roles = [], allPermissions = [], refreshRole
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roles.map((role) => (
+              {(roles || []).map((role) => (
                 <TableRow key={role.id}>
                   <TableCell className="font-medium">{role.name}</TableCell>
                   <TableCell>
-                    <Badge variant={role.name === "Propietario" ? "default" : "secondary"}>{role.permissions.size} de {allPermissions.length}</Badge>
+                    <Badge variant={role.name === "Propietario" ? "default" : "secondary"}>{role.permissions.size} de {(allPermissions || []).length}</Badge>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
