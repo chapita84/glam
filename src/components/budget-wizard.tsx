@@ -81,9 +81,9 @@ export function BudgetWizard() {
       setServices(services.filter((_, i) => i !== index));
   };
   
-  const servicesTotal = services.reduce((total, service) => total + (service.quantity * service.price), 0);
-  const totalUSD = servicesTotal + logisticsCost;
-  const totalARS = totalUSD * usdRate;
+  const servicesTotal = services.reduce((total, service) => total + ((service.quantity || 0) * (service.price || 0)), 0);
+  const totalUSD = servicesTotal + (logisticsCost || 0);
+  const totalARS = totalUSD * (usdRate || 0);
 
   const budgetData = {
     ...eventDetails,
@@ -184,7 +184,7 @@ export function BudgetWizard() {
                                 <TableCell>
                                     <Input type="number" value={service.price} onChange={e => handleServiceChange(index, 'price', e.target.value)} />
                                 </TableCell>
-                                <TableCell>${(service.quantity * service.price).toFixed(2)}</TableCell>
+                                <TableCell>${((service.quantity || 0) * (service.price || 0)).toFixed(2)}</TableCell>
                                 <TableCell>
                                     <Button variant="ghost" size="icon" onClick={() => removeService(index)}>
                                         <Trash2 className="h-4 w-4" />
@@ -234,7 +234,7 @@ export function BudgetWizard() {
                          {services.map((service, index) => (
                             <div key={index} className="flex justify-between">
                                 <span>{service.name} x{service.quantity}</span>
-                                <span>${(service.quantity * service.price).toFixed(2)}</span>
+                                <span>${((service.quantity || 0) * (service.price || 0)).toFixed(2)}</span>
                             </div>
                         ))}
                     </div>
@@ -244,7 +244,7 @@ export function BudgetWizard() {
                     </div>
                      <div className="flex justify-between">
                         <span className="text-muted-foreground">Logística:</span>
-                        <span className="font-medium">${logisticsCost.toFixed(2)}</span>
+                        <span className="font-medium">${(logisticsCost || 0).toFixed(2)}</span>
                     </div>
                      <div className="flex justify-between text-lg font-bold border-t pt-4 mt-4">
                         <span>Total (USD):</span>
