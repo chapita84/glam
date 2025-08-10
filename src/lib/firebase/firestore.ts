@@ -207,6 +207,10 @@ export async function deleteService(tenantId: string, serviceId: string): Promis
  * @returns A promise that resolves to an array of Booking objects.
  */
 export async function getBookings(tenantId: string): Promise<Booking[]> {
+    if (!tenantId) {
+        console.log("getBookings called without a tenantId, returning empty array.");
+        return [];
+    }
     const bookingsCollectionRef = collection(db, 'tenants', tenantId, 'bookings');
     try {
         const querySnapshot = await getDocs(bookingsCollectionRef);

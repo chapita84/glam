@@ -2,62 +2,38 @@
 'use client'
 
 import { AppointmentsCalendar } from "@/components/appointments-calendar";
-import { getBookings, type Booking, type Service, type StaffMember } from "@/lib/firebase/firestore";
-import { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { type Booking, type Service, type StaffMember } from "@/lib/firebase/firestore";
 
 interface AppointmentsPageProps {
   staff: StaffMember[];
   services: Service[];
+  bookings: Booking[];
   tenantId: string;
   refreshData: () => void;
+  loading: boolean;
 }
 
-export default function AppointmentsPage({ staff, services, tenantId, refreshData }: AppointmentsPageProps) {
-    const [bookings, setBookings] = useState<Booking[]>([]);
-    const [loading, setLoading] = useState(true);
-    
-    const fetchBookings = async () => {
-        if (!tenantId) return; // Prevenir la ejecución si tenantId es undefined
-        setLoading(true);
-        const fetchedBookings = await getBookings(tenantId);
-        setBookings(fetchedBookings);
-        setLoading(false);
-    };
-
-    useEffect(() => {
-        fetchBookings();
-    }, [tenantId]);
-
+export default function AppointmentsPage({ staff, services, bookings, tenantId, refreshData, loading }: AppointmentsPageProps) {
     const handleBookingCreated = () => {
-        fetchBookings(); // Refresca las reservas cuando se crea una nueva
         if (refreshData) {
-            refreshData(); // Llama a la función global de refresco si es necesario
+            refreshData(); 
         }
     };
 
+    if (loading) {
+        return <p>Cargando citas...</p>
+    }
 
     return (
         <div className="flex flex-col gap-6">
             <h1 className="text-3xl font-bold tracking-tight">Citas</h1>
-            {loading ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                       <Skeleton className="h-[370px] w-full" />
-                    </div>
-                    <div>
-                        <Skeleton className="h-[400px] w-full" />
-                    </div>
-                </div>
-            ) : (
-                <AppointmentsCalendar 
-                    bookings={bookings} 
-                    staff={staff || []}
-                    services={services || []}
-                    tenantId={tenantId}
-                    onBookingCreated={handleBookingCreated}
-                />
-            )}
+            <AppointmentsCalendar 
+                bookings={bookings || []} 
+                staff={staff || []}
+                services={services || []}
+                tenantId={tenantId}
+                onBookingCreated={handleBookingCreated}
+            />
         </div>
     );
 }

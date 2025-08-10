@@ -3,7 +3,7 @@
 
 import type { PropsWithChildren } from 'react';
 import React, { useState, useEffect } from 'react';
-import { getRoles, getStaff, getServices, type StaffMember, type Service } from '@/lib/firebase/firestore';
+import { getRoles, getStaff, getServices, getBookings, type StaffMember, type Service, type Booking } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -73,6 +73,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Using a mock tenantId for now
@@ -80,14 +81,16 @@ export default function AppLayout({ children }: PropsWithChildren) {
 
   const refreshData = async () => {
     setLoading(true);
-    const [fetchedRoles, fetchedStaff, fetchedServices] = await Promise.all([
+    const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings] = await Promise.all([
       getRoles(tenantId),
       getStaff(tenantId),
-      getServices(tenantId)
+      getServices(tenantId),
+      getBookings(tenantId)
     ]);
     setRoles(fetchedRoles);
     setStaff(fetchedStaff);
     setServices(fetchedServices);
+    setBookings(fetchedBookings);
     setLoading(false);
   };
   
@@ -102,6 +105,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
           roles, 
           staff,
           services,
+          bookings,
           allPermissions, 
           refreshData, 
           loading,
