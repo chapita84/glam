@@ -42,7 +42,8 @@ import {
   Settings,
   Sun,
   Moon,
-  Laptop
+  Laptop,
+  CreditCard
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -55,6 +56,7 @@ const navItems = [
     { href: "/staff", icon: Users, label: "Personal" },
     { href: "/roles", icon: Fingerprint, label: "Roles" },
     { href: "/budgets", icon: Wand2, label: "Presupuestos" },
+    { href: "/billing", icon: CreditCard, label: "Facturación" },
 ]
 
 export type Permission = {
