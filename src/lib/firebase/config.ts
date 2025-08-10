@@ -1,6 +1,5 @@
-
 // src/lib/firebase/config.ts
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
@@ -15,26 +14,20 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
-}
-
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
 // Enable Firestore offline persistence
 try {
     enableIndexedDbPersistence(db);
+    console.log("Firebase persistence enabled.");
 } catch (error: any) {
     if (error.code === 'failed-precondition') {
-        console.warn('Firebase persistence failed. This happens when multiple tabs are open.');
+        console.warn('Firebase persistence failed. This may happen when multiple tabs are open.');
     } else if (error.code === 'unimplemented') {
-        console.log('Firebase persistence is not available in this browser.');
+        console.log('Firebase persistence is not available in this browser environment.');
     }
 }
 
-
-export { db, auth, app };
+export { db, auth };
