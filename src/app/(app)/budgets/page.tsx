@@ -5,7 +5,7 @@ import React, { useState } from "react"
 import { BudgetWizard } from "@/components/budget-wizard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PlusCircle, MoreHorizontal } from "lucide-react";
 import { type Budget, deleteBudget } from "@/lib/firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,7 +36,7 @@ export default function BudgetsPage({ budgets = [], tenantId, refreshData, loadi
         setOpen(true);
     };
 
-    const handleDeleteBudget = async (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm("¿Estás seguro de que quieres eliminar este presupuesto?")) {
             await deleteBudget(tenantId, id);
             refreshData();
@@ -59,6 +59,12 @@ export default function BudgetsPage({ budgets = [], tenantId, refreshData, loadi
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>{editingBudget ? "Editar Presupuesto" : "Crear Nuevo Presupuesto"}</DialogTitle>
+                            <DialogDescription>
+                                Utiliza el asistente para generar, personalizar y gestionar un presupuesto para un evento.
+                            </DialogDescription>
+                        </DialogHeader>
                         <BudgetWizard 
                             tenantId={tenantId} 
                             initialBudget={editingBudget}
@@ -124,4 +130,3 @@ export default function BudgetsPage({ budgets = [], tenantId, refreshData, loadi
         </div>
     );
 }
-
