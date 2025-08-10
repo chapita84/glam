@@ -34,23 +34,35 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
   const { toast } = useToast();
 
   useEffect(() => {
-    setConfig(initialConfig);
+    // Sync local state when props change
+    if (initialConfig) {
+      setConfig(initialConfig);
+    }
   }, [initialConfig]);
 
   const handleWorkingHoursChange = (dayId: number, field: 'startTime' | 'endTime' | 'enabled', value: string | boolean) => {
     setConfig(prevConfig => {
       if (!prevConfig) return null;
       
-      const newWorkingHours = [...(prevConfig.workingHours || [])];
-      const dayIndex = newWorkingHours.findIndex(d => d.dayOfWeek === dayId);
-      
-      if (dayIndex > -1) {
-        (newWorkingHours[dayIndex] as any)[field] = value;
-      } else {
-        newWorkingHours.push({ dayOfWeek: dayId, startTime: "09:00", endTime: "18:00", enabled: true, ...{[field]: value} });
+      const newWorkingHours = prevConfig.workingHours ? [...prevConfig.workingHours] : [];
+      let dayFound = false;
+
+      // Find and update the day
+      const updatedHours = newWorkingHours.map(d => {
+        if (d.dayOfWeek === dayId) {
+          dayFound = true;
+          return { ...d, [field]: value };
+        }
+        return d;
+      });
+
+      // If the day was not found, add it
+      if (!dayFound) {
+        const defaultDay = { dayOfWeek: dayId, startTime: "09:00", endTime: "18:00", enabled: false };
+        updatedHours.push({ ...defaultDay, [field]: value });
       }
 
-      return { ...prevConfig, workingHours: newWorkingHours };
+      return { ...prevConfig, workingHours: updatedHours };
     });
   };
 
@@ -61,7 +73,12 @@ export default function SettingsPage({ config: initialConfig, tenantId, refreshD
       }
       setIsSaving(true);
       try {
-          await updateTenantConfig(tenantId, config);
+          // We need to ensure workingHours is sorted before saving
+          const configToSave = {
+              ...config,
+              workingHours: [...config.workingHours].sort((a,b) => a.dayOfWeek - b.dayOfWeek)
+          };
+          await updateTenantConfig(tenantId, configToSave);
           toast({ title: "Éxito", description: "La configuración se ha guardado correctamente." });
           await refreshData();
       } catch (error) {
