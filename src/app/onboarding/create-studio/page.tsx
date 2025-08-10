@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { Button } from "@/components/ui/button"
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Fingerprint, Sparkles, Loader2 } from "lucide-react"
+import { Sparkles, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
@@ -34,8 +35,8 @@ export default function CreateStudioPage() {
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-4">
         <div className="text-center mb-8">
-            <Fingerprint className="mx-auto h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty Dash</h1>
+            <Sparkles className="mx-auto h-12 w-12 text-primary" />
+            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty <span className="text-accent">Dash</span></h1>
         </div>
         <Card>
           <CardHeader className="text-center">

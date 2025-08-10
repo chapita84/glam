@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useActionState } from 'react'
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Terminal, CheckCircle, Loader2, Fingerprint } from "lucide-react"
+import { Terminal, CheckCircle, Loader2, Sparkles } from "lucide-react"
 import { redirect } from 'next/navigation'
 import { useEffect } from 'react'
 
@@ -65,8 +66,8 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="w-full max-w-md p-4">
         <div className="text-center mb-8">
-            <Fingerprint className="mx-auto h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty Dash</h1>
+            <Sparkles className="mx-auto h-12 w-12 text-primary" />
+            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty <span className="text-accent">Dash</span></h1>
             <p className="text-muted-foreground">Crea una cuenta para empezar a gestionar tu estudio o reservar servicios.</p>
         </div>
         <Card>

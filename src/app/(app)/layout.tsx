@@ -141,9 +141,9 @@ export default function AppLayout({ children }: PropsWithChildren) {
       <Sidebar side="left" variant="sidebar" collapsible="icon">
         <SidebarHeader>
             <div className="flex items-center gap-2 p-2">
-                <Fingerprint className="w-8 h-8 text-sidebar-primary" />
+                <Sparkles className="w-8 h-8 text-sidebar-primary" />
                 <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsible=icon]:hidden">
-                    Glam&Beauty Dash
+                    Glam&Beauty
                 </h1>
             </div>
         </SidebarHeader>
