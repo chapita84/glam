@@ -1,7 +1,10 @@
 
+
 import { db } from './config';
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import type { Role } from '@/app/(app)/layout';
+import type { BudgetItem } from '@/app/(app)/budgets/actions';
+
 
 // Type for role data stored in Firestore
 type RoleFirestoreData = {
@@ -35,7 +38,7 @@ export type Client = {
 }
 
 export type Booking = {
-    id: string; // bookingId
+    id?: string; // bookingId, optional for creation
     clientId: string;
     clientName: string;
     staffId: string;
@@ -50,9 +53,26 @@ export type Booking = {
         amount: number;
         currency: string;
     };
-    createdAt: any;
+    createdAt?: any;
     notes?: string;
 }
+
+export type Budget = {
+    id?: string;
+    eventType: string;
+    eventDate: string;
+    eventTime: string;
+    eventLocation: string;
+    services: BudgetItem[];
+    logisticsCost: number;
+    usdRate: number;
+    totalUSD: number;
+    totalDuration: number;
+    status: 'in_preparation' | 'sent' | 'confirmed' | 'rejected';
+    createdAt?: any;
+    updatedAt?: any;
+}
+
 
 export type WorkingHour = {
     dayOfWeek: number; // 0 (Sunday) to 6 (Saturday)
@@ -310,7 +330,7 @@ export async function getBookings(tenantId: string): Promise<Booking[]> {
  * @param tenantId The ID of the tenant.
  * @param booking The booking object to add or update.
  */
-export async function addOrUpdateBooking(tenantId: string, booking: Omit<Booking, 'id' | 'createdAt' | 'endTime'> & { id?: string }): Promise<void> {
+export async function addOrUpdateBooking(tenantId: string, booking: Omit<Booking, 'createdAt' | 'endTime'> & { id?: string }): Promise<void> {
     // If no id is provided, a new one will be generated automatically by Firestore
     const bookingDocRef = booking.id 
         ? doc(db, 'tenants', tenantId, 'bookings', booking.id)
@@ -342,5 +362,62 @@ export async function deleteBooking(tenantId: string, bookingId: string): Promis
         console.log("Booking deleted successfully: ", bookingId);
     } catch (error) {
         console.error("Error deleting booking: ", error);
+    }
+}
+
+/**
+ * Fetches all budgets for a given tenant from Firestore.
+ */
+export async function getBudgets(tenantId: string): Promise<Budget[]> {
+    if (!tenantId) return [];
+    const budgetsCollectionRef = collection(db, 'tenants', tenantId, 'budgets');
+    const q = query(budgetsCollectionRef, orderBy('createdAt', 'desc'));
+    try {
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
+    } catch (error) {
+        console.error("Error fetching budgets: ", error);
+        return [];
+    }
+}
+
+/**
+ * Adds or updates a budget in Firestore.
+ * @returns The ID of the saved budget.
+ */
+export async function addOrUpdateBudget(tenantId: string, budget: Budget): Promise<string> {
+    const budgetDocRef = budget.id
+        ? doc(db, 'tenants', tenantId, 'budgets', budget.id)
+        : doc(collection(db, 'tenants', tenantId, 'budgets'));
+    
+    const budgetData = {
+        ...budget,
+        id: budgetDocRef.id,
+        updatedAt: serverTimestamp(),
+    };
+    if (!budget.id) {
+        budgetData.createdAt = serverTimestamp();
+    }
+
+    try {
+        await setDoc(budgetDocRef, budgetData, { merge: true });
+        console.log("Budget saved successfully: ", budgetDocRef.id);
+        return budgetDocRef.id;
+    } catch (error) {
+        console.error("Error saving budget: ", error);
+        throw error;
+    }
+}
+
+/**
+ * Deletes a budget from Firestore.
+ */
+export async function deleteBudget(tenantId: string, budgetId: string): Promise<void> {
+    const budgetDocRef = doc(db, 'tenants', tenantId, 'budgets', budgetId);
+    try {
+        await deleteDoc(budgetDocRef);
+        console.log("Budget deleted successfully: ", budgetId);
+    } catch (error) {
+        console.error("Error deleting budget: ", error);
     }
 }

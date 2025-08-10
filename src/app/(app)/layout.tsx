@@ -1,9 +1,10 @@
 
+
 'use client'
 
 import type { PropsWithChildren } from 'react';
 import React, { useState, useEffect, useCallback } from 'react';
-import { getRoles, getStaff, getServices, getBookings, getTenantConfig, type StaffMember, type Service, type Booking, type TenantConfig } from '@/lib/firebase/firestore';
+import { getRoles, getStaff, getServices, getBookings, getTenantConfig, getBudgets, type StaffMember, type Service, type Booking, type TenantConfig, type Budget } from '@/lib/firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -82,6 +83,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [config, setConfig] = useState<TenantConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
@@ -92,18 +94,20 @@ export default function AppLayout({ children }: PropsWithChildren) {
 
   const refreshData = useCallback(async () => {
     setLoading(true);
-    const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings, fetchedConfig] = await Promise.all([
+    const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings, fetchedConfig, fetchedBudgets] = await Promise.all([
       getRoles(tenantId),
       getStaff(tenantId),
       getServices(tenantId),
       getBookings(tenantId),
       getTenantConfig(tenantId),
+      getBudgets(tenantId),
     ]);
     setRoles(fetchedRoles);
     setStaff(fetchedStaff);
     setServices(fetchedServices);
     setBookings(fetchedBookings);
     setConfig(fetchedConfig);
+    setBudgets(fetchedBudgets);
     setLoading(false);
   }, [tenantId]);
   
@@ -119,6 +123,7 @@ export default function AppLayout({ children }: PropsWithChildren) {
           staff,
           services,
           bookings,
+          budgets,
           config,
           allPermissions, 
           refreshData, 
