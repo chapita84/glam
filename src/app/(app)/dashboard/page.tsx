@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -24,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
-import { Clock, DollarSign, Star, Users, ArrowUp } from "lucide-react"
+import { Clock, DollarSign, Star, Users, ArrowUp, Sparkles } from "lucide-react"
 
 const chartData = [
   { month: "Enero", revenue: 1860 },
