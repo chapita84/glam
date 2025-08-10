@@ -47,7 +47,7 @@ interface RolesPageProps {
   allPermissions: Permission[];
 }
 
-export default function RolesPage({ roles, setRoles, allPermissions }: RolesPageProps) {
+export default function RolesPage({ roles = [], setRoles, allPermissions = [] }: RolesPageProps) {
   const [open, setOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
 
@@ -66,7 +66,7 @@ export default function RolesPage({ roles, setRoles, allPermissions }: RolesPage
             .map(p => p.id)
     );
 
-    if (roleName) {
+    if (roleName && setRoles) {
         if (editingRole) {
             setRoles(roles.map(r => r.id === editingRole.id ? { ...r, name: roleName, permissions: selectedPermissions } : r));
         } else {
@@ -79,9 +79,10 @@ export default function RolesPage({ roles, setRoles, allPermissions }: RolesPage
   };
 
   const handleDeleteRole = (roleId: string) => {
-    setRoles(roles.filter(r => r.id !== roleId));
+    if (setRoles) {
+      setRoles(roles.filter(r => r.id !== roleId));
+    }
   };
-
 
   return (
     <div className="flex flex-col gap-6">

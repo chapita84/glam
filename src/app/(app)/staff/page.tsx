@@ -60,7 +60,7 @@ interface StaffPageProps {
   roles: Role[];
 }
 
-export default function StaffPage({ roles }: StaffPageProps) {
+export default function StaffPage({ roles = [] }: StaffPageProps) {
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>(initialStaffMembers)
   const [open, setOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);

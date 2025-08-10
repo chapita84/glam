@@ -103,9 +103,10 @@ const initialRoles: Role[] = [
 
 export default function AppLayout({ children }: PropsWithChildren) {
   const [roles, setRoles] = useState<Role[]>(initialRoles);
+  
   const childrenWithProps = React.Children.map(children, child => {
     if (React.isValidElement(child)) {
-      // @ts-ignore
+      // @ts-ignore - cloning child to pass props
       return React.cloneElement(child, { roles, setRoles, allPermissions });
     }
     return child;
