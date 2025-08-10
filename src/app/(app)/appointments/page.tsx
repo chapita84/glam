@@ -18,6 +18,7 @@ export default function AppointmentsPage({ staff, services, tenantId, refreshDat
     const [loading, setLoading] = useState(true);
     
     const fetchBookings = async () => {
+        if (!tenantId) return; // Prevenir la ejecución si tenantId es undefined
         setLoading(true);
         const fetchedBookings = await getBookings(tenantId);
         setBookings(fetchedBookings);
@@ -30,7 +31,9 @@ export default function AppointmentsPage({ staff, services, tenantId, refreshDat
 
     const handleBookingCreated = () => {
         fetchBookings(); // Refresca las reservas cuando se crea una nueva
-        refreshData(); // Llama a la función global de refresco si es necesario
+        if (refreshData) {
+            refreshData(); // Llama a la función global de refresco si es necesario
+        }
     };
 
 
@@ -49,8 +52,8 @@ export default function AppointmentsPage({ staff, services, tenantId, refreshDat
             ) : (
                 <AppointmentsCalendar 
                     bookings={bookings} 
-                    staff={staff}
-                    services={services}
+                    staff={staff || []}
+                    services={services || []}
                     tenantId={tenantId}
                     onBookingCreated={handleBookingCreated}
                 />
