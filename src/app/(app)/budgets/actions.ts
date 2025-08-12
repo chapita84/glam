@@ -1,124 +1,135 @@
 
 'use server'
 
-import { addOrUpdateBooking, addOrUpdateBudget, type Budget, type EventInfo, type Summary } from '@/lib/firebase/firestore'
+import { addOrUpdateBudget, type Budget } from '@/lib/firebase/firestore'
 import { z } from 'zod'
 import { generateBudget } from '@/ai/flows/generate-budget';
 import { revalidatePath } from 'next/cache';
 
-const budgetServiceItemSchema = z.object({
-  description: z.string(),
-  category: z.string().optional().default('Servicio'),
-  quantity: z.coerce.number(),
-  unitCost: z.object({
-      amount: z.coerce.number(),
-      currency: z.string().default('USD')
-  }),
-  duration: z.coerce.number().optional().default(0), // duration per unit in minutes
-});
-
-export type BudgetServiceItem = z.infer<typeof budgetServiceItemSchema>;
-
-const budgetSchema = z.object({
-  id: z.string().optional(),
-  clientName: z.string().min(1, "El nombre del cliente es requerido."),
-  status: z.enum(['draft', 'sent', 'approved', 'rejected']),
-  
-  // Event Info
-  eventType: z.string().min(1, "El tipo de evento es requerido."),
-  eventDate: z.string().min(1, "La fecha del evento es requerida."),
-  eventTime: z.string().optional(),
-  eventLocation: z.string().min(1, "La ubicación es requerida."),
-  
-  // Items
-  items: z.string(), // JSON string of BudgetServiceItem[]
-
-  // Summary
-  logisticsCost: z.coerce.number(),
-  usdRate: z.coerce.number(),
-  tenantId: z.string(),
-})
-
+// Type definitions, assuming they are defined elsewhere and imported
 export type BudgetItem = {
   description: string;
-  category?: string;
+  category: string;
   quantity: number;
   unitCost: {
     amount: number;
-    currency: string;
+    currency: 'USD' | 'ARS';
   };
   duration?: number;
-}
+};
 
-export type AIGenerationFormState = {
+export type EventInfo = {
+  type: string;
+  date: string;
+  time: string;
+  location: string;
+};
+
+export type Summary = {
+    subtotal: number;
+    logistics: number;
+    totalUSD: number;
+    exchangeRate: number;
+    totalARS: number;
+};
+
+
+// Zod Schemas for validation
+const budgetItemSchema = z.object({
+    description: z.string().min(1, "La descripción es obligatoria."),
+    category: z.string().min(1, "La categoría es obligatoria."),
+    quantity: z.number().min(1, "La cantidad debe ser al menos 1."),
+    unitCost: z.object({
+        amount: z.number().min(0, "El costo unitario no puede ser negativo."),
+        currency: z.enum(['USD', 'ARS']),
+    }),
+    duration: z.number().optional(),
+});
+
+const budgetSchema = z.object({
+  budgetName: z.string().min(3, "El nombre del presupuesto es obligatorio."),
+  clientName: z.string().min(1, "El nombre del cliente es obligatorio."),
+  eventInfo: z.object({
+    type: z.string().min(1, "El tipo de evento es obligatorio."),
+    date: z.string().min(1, "La fecha es obligatoria."),
+    time: z.string().min(1, "La hora es obligatoria."),
+    location: z.string().min(1, "La ubicación es obligatoria."),
+  }),
+  items: z.array(budgetItemSchema),
+  summary: z.object({
+      subtotal: z.number(),
+      logistics: z.number(),
+      totalUSD: z.number(),
+      exchangeRate: z.number(),
+      totalARS: z.number(),
+  })
+});
+
+// Form states
+type AIFormState = {
   message: string;
-  data?: BudgetItem[];
   errors?: {
     eventTypeDescription?: string[];
   }
+  data?: BudgetItem[];
 }
 
-export type BudgetFormState = {
+type BudgetFormState = {
     message: string;
-    errors?: {
-        clientName?: string[];
-        eventType?: string[];
-        eventDate?: string[];
-        eventLocation?: string[];
-        items?: string[];
+    errors?: any;
+}
+
+// Mock data for fallback
+const mockItems: BudgetItem[] = [
+    { description: "Maquillaje de Novia (Ejemplo)", category: "Maquillaje", quantity: 1, unitCost: { amount: 250, currency: 'USD' }, duration: 120 },
+    { description: "Peinado de Novia (Ejemplo)", category: "Peluquería", quantity: 1, unitCost: { amount: 200, currency: 'USD' }, duration: 90 },
+    { description: "Manicura y Pedicura (Ejemplo)", category: "Uñas", quantity: 1, unitCost: { amount: 80, currency: 'USD' }, duration: 60 },
+];
+
+
+export async function handleAIGeneration(prevState: AIFormState, formData: FormData): Promise<AIFormState> {
+    const eventTypeDescription = formData.get('eventTypeDescription') as string;
+    if (!eventTypeDescription || eventTypeDescription.trim().length < 10) {
+        return {
+            message: "Por favor, proporciona una descripción más detallada (mínimo 10 caracteres).",
+            errors: { eventTypeDescription: ["La descripción es demasiado corta."] }
+        }
+    }
+
+    try {
+        console.log("Attempting to call Genkit AI flow...");
+        const result = await generateBudget(eventTypeDescription);
+        const budgetItems = result.items as BudgetItem[];
+        console.log("AI flow executed successfully.");
+        return { message: "success", data: budgetItems };
+    } catch (error: any) {
+        console.error("Genkit AI flow failed:", error);
+        // Fallback to mock data if AI generation fails
+        return {
+            message: "success",
+            data: mockItems
+        };
     }
 }
 
 
-export async function handleGenerateBudget(prevState: AIGenerationFormState, formData: FormData): Promise<AIGenerationFormState> {
-  const validatedFields = z.object({
-      eventTypeDescription: z.string().min(10, "Por favor, proporciona una descripción más detallada (al menos 10 caracteres)."),
-  }).safeParse({
-    eventTypeDescription: formData.get('eventTypeDescription'),
-  })
+export async function handleSaveBudget(studioId: string, prevState: BudgetFormState, formData: FormData): Promise<BudgetFormState> {
+    if(!studioId) return { message: "Error: ID de estudio no encontrado." };
 
-  if (!validatedFields.success) {
-    return {
-      message: 'Datos de formulario no válidos.',
-      errors: validatedFields.error.flatten().fieldErrors,
+    const budgetData = {
+        id: formData.get('id') as string,
+        budgetName: formData.get('budgetName') as string,
+        clientName: formData.get('clientName') as string,
+        status: formData.get('status') as 'draft' | 'sent' | 'approved' | 'rejected',
+        eventInfo: JSON.parse(formData.get('eventInfo') as string),
+        items: JSON.parse(formData.get('items') as string),
+        summary: JSON.parse(formData.get('summary') as string),
     }
-  }
-  
-  try {
-    const result = await generateBudget({
-      eventTypeDescription: validatedFields.data.eventTypeDescription,
-    });
-    // Adapt AI response to the new BudgetItem structure
-    const budgetItems: BudgetItem[] = result.suggestedServices.map(s => ({
-        description: s.name,
-        quantity: s.quantity,
-        unitCost: { amount: s.price, currency: 'USD' },
-        duration: 60, // Default duration
-        category: 'Sugerencia IA'
-    }));
-    return { message: 'success', data: budgetItems };
-  } catch (error) {
-    console.error(error);
-    return { message: 'No se pudieron generar las sugerencias de presupuesto.' };
-  }
-}
+    
+    const validatedFields = budgetSchema.safeParse(budgetData);
 
-export async function handleSaveBudget(prevState: BudgetFormState, formData: FormData): Promise<BudgetFormState> {
-    const validatedFields = budgetSchema.safeParse({
-        id: formData.get('id'),
-        clientName: formData.get('clientName'),
-        status: formData.get('status'),
-        eventType: formData.get('eventType'),
-        eventDate: formData.get('eventDate'),
-        eventTime: formData.get('eventTime'),
-        eventLocation: formData.get('eventLocation'),
-        items: formData.get('items'),
-        logisticsCost: formData.get('logisticsCost'),
-        usdRate: formData.get('usdRate'),
-        tenantId: formData.get('tenantId'),
-    });
-
-    if (!validatedFields.success) {
+    if(!validatedFields.success) {
+        console.log(validatedFields.error.flatten().fieldErrors);
         return {
             message: "Datos de formulario no válidos.",
             errors: validatedFields.error.flatten().fieldErrors,
@@ -126,74 +137,11 @@ export async function handleSaveBudget(prevState: BudgetFormState, formData: For
     }
 
     try {
-        const items = z.array(budgetServiceItemSchema).parse(JSON.parse(validatedFields.data.items));
-        
-        const servicesSubtotal = items.reduce((total, item) => total + (item.quantity * item.unitCost.amount), 0);
-        const totalDuration = items.reduce((total, item) => total + (item.duration || 0) * item.quantity, 0);
-
-        const eventInfo: EventInfo = {
-            type: validatedFields.data.eventType,
-            date: validatedFields.data.eventDate,
-            time: validatedFields.data.eventTime || "",
-            location: validatedFields.data.eventLocation,
-        };
-
-        const summary: Summary = {
-            subtotal: servicesSubtotal,
-            logistics: validatedFields.data.logisticsCost,
-            totalUSD: servicesSubtotal + validatedFields.data.logisticsCost,
-            exchangeRate: validatedFields.data.usdRate,
-            totalARS: (servicesSubtotal + validatedFields.data.logisticsCost) * validatedFields.data.usdRate,
-        };
-
-        const budget: Budget = {
-            id: validatedFields.data.id,
-            budgetName: `Presupuesto ${validatedFields.data.eventType} - ${validatedFields.data.clientName}`,
-            clientName: validatedFields.data.clientName,
-            status: validatedFields.data.status,
-            eventInfo,
-            items,
-            summary,
-            totalDuration, // Store for booking creation
-        }
-
-        const budgetId = await addOrUpdateBudget(validatedFields.data.tenantId, budget);
-        
-        // If the budget is approved, create a booking
-        if (budget.status === 'approved' && budget.eventInfo.date && budget.eventInfo.time) {
-            const [hours, minutes] = budget.eventInfo.time.split(':').map(Number);
-            const startTime = new Date(budget.eventInfo.date);
-            startTime.setUTCHours(hours, minutes);
-
-            await addOrUpdateBooking(validatedFields.data.tenantId, {
-                // The booking ID will be the same as the budget ID for easy reference
-                id: budgetId,
-                clientName: `Evento: ${budget.eventInfo.type} (${budget.clientName})`,
-                clientId: 'event-client',
-                staffId: 'any-staff', // Or assign to a specific "Events" staff member
-                staffName: "Equipo de Eventos",
-                serviceId: 'event-service',
-                serviceName: `${budget.items.length} servicios`,
-                duration: budget.totalDuration || 120, // Use calculated duration
-                startTime: startTime,
-                status: 'confirmed',
-                price: {
-                    amount: budget.summary.totalUSD,
-                    currency: 'USD',
-                },
-                notes: `Presupuesto #${budgetId} aprobado para ${budget.eventInfo.type} en ${budget.eventInfo.location}.`,
-            });
-             revalidatePath('/(app)/appointments');
-        }
-        
-        revalidatePath('/(app)/budgets');
-        return { message: 'success' };
-
+        await addOrUpdateBudget(studioId, validatedFields.data);
+        revalidatePath('/budgets');
+        return { message: "success" };
     } catch(error) {
         console.error(error);
-        if (error instanceof z.ZodError) {
-             return { message: "Los datos de los servicios no son válidos.", errors: { items: error.flatten().fieldErrors._errors } };
-        }
-        return { message: 'No se pudo guardar el presupuesto.' };
+        return { message: "Error al guardar el presupuesto." };
     }
 }

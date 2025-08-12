@@ -1,10 +1,10 @@
 
-
 'use client'
 
-import { useActionState } from "react"
-import { useFormStatus } from "react-dom"
-import { handleLogin } from "@/app/login/actions"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { signInWithEmailAndPassword } from "firebase/auth"
+import { auth } from "@/lib/firebase/config"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -18,12 +18,10 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Terminal, Loader2, Sparkles } from "lucide-react"
-import { redirect } from 'next/navigation'
-import { useEffect } from 'react'
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M15.5 17.5a2.5 2.5 0 0 1-5 0" />
       <path d="M22 10.5v3c0 1.25-.75 4.5-4.5 4.5H6.5c-3.75 0-4.5-3.25-4.5-4.5v-3c0-1.25.75-4.5 4.5-4.5h11c3.75 0 4.5 3.25 4.5 4.5Z" />
       <path d="M8 11h.01" />
@@ -34,31 +32,44 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
     </svg>
   );
 }
 
-const SubmitButton = () => {
-    const { pending } = useFormStatus();
-    return (
-        <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Iniciar Sesión"}
-        </Button>
-    )
-}
-
 export default function LoginPage() {
-  const [state, formAction] = useActionState(handleLogin, {
-    message: "",
-  });
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (state.message === 'success') {
-      redirect('/dashboard');
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/select-studio');
+    } catch (error: any) {
+      let errorMessage = 'Error al iniciar sesión. Por favor, inténtalo de nuevo.';
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          errorMessage = 'Correo electrónico o contraseña incorrectos.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'El formato del correo electrónico no es válido.';
+          break;
+      }
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  }, [state.message]);
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -76,13 +87,13 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={formAction} className="grid gap-4">
-              {state.message && state.message !== 'success' && (
+            <form onSubmit={handleLogin} className="grid gap-4">
+              {error && (
                   <Alert variant="destructive">
                       <Terminal className="h-4 w-4" />
                       <AlertTitle>Error de inicio de sesión</AlertTitle>
                       <AlertDescription>
-                          {state.message}
+                          {error}
                       </AlertDescription>
                   </Alert>
               )}
@@ -94,8 +105,9 @@ export default function LoginPage() {
                   type="email"
                   placeholder="nombre@ejemplo.com"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
-                 {state.errors?.email && <p className="text-sm font-medium text-destructive">{state.errors.email[0]}</p>}
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
@@ -107,10 +119,18 @@ export default function LoginPage() {
                     ¿Olvidaste tu contraseña?
                   </Link>
                 </div>
-                <Input id="password" name="password" type="password" required />
-                {state.errors?.password && <p className="text-sm font-medium text-destructive">{state.errors.password[0]}</p>}
+                <Input 
+                  id="password" 
+                  name="password" 
+                  type="password" 
+                  required 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
               </div>
-              <SubmitButton />
+              <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Iniciar Sesión"}
+              </Button>
             </form>
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">

@@ -2,6 +2,7 @@
 'use client'
 
 import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -128,7 +129,9 @@ export default function SearchPage() {
                 <Input placeholder="Buscar por estudio o servicio..." className="pl-10" />
             </div>
             <div className="ml-auto">
-                <Button>Iniciar Sesión</Button>
+                <Link href="/login">
+                    <Button>Iniciar Sesión</Button>
+                </Link>
             </div>
         </div>
       </header>

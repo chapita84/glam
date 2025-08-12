@@ -1,69 +1,77 @@
 
-
 'use client'
 
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Sparkles, Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { createStudio } from "@/lib/firebase/firestore";
+import { useAuth } from "@/hooks/use-auth";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CreateStudioPage() {
+    const { user, loading } = useAuth();
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const { toast } = useToast();
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        setLoading(true);
-        // Aquí iría la lógica para crear el tenant en Firestore
-        // y luego redirigir a la pasarela de pago de Stripe.
-        // Por ahora, simulamos el proceso y redirigimos al dashboard.
-        setTimeout(() => {
-            router.push('/dashboard');
-        }, 1500);
+        setIsCreating(true);
+        const formData = new FormData(event.currentTarget);
+        const studioName = formData.get("studioName") as string;
+
+        if (user && studioName) {
+            try {
+                await createStudio(studioName, user);
+                toast({ title: "¡Estudio Creado!", description: "Bienvenido a tu nuevo espacio de gestión." });
+                router.push('/dashboard');
+            } catch (error: any) {
+                toast({ title: "Error", description: `No se pudo crear el estudio: ${error.message}`, variant: "destructive" });
+                setIsCreating(false);
+            }
+        } else {
+             toast({ title: "Error", description: "Debes iniciar sesión y proporcionar un nombre para el estudio.", variant: "destructive" });
+             setIsCreating(false);
+        }
+    };
+
+    if (loading) {
+        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="w-full max-w-md p-4">
-        <div className="text-center mb-8">
-            <Sparkles className="mx-auto h-12 w-12 text-primary" />
-            <h1 className="text-4xl font-bold tracking-wider mt-2">Glam&Beauty <span className="text-accent">Dash</span></h1>
+    return (
+        <div className="flex h-screen items-center justify-center bg-background">
+            <Card className="w-full max-w-md">
+                <CardHeader>
+                    <CardTitle className="text-2xl">Crea tu Estudio</CardTitle>
+                    <CardDescription>
+                        Dale un nombre a tu espacio de trabajo. Podrás cambiarlo más tarde.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={handleSubmit}>
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="studioName">Nombre del Estudio</Label>
+                                <Input
+                                    id="studioName"
+                                    name="studioName"
+                                    placeholder="p. ej. 'Estudio de Belleza Glamour'"
+                                    required
+                                />
+                            </div>
+                            <Button type="submit" className="w-full" disabled={isCreating}>
+                                {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Crear y Continuar
+                            </Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
         </div>
-        <Card>
-          <CardHeader className="text-center">
-            <Sparkles className="mx-auto h-10 w-10 text-yellow-400" />
-            <CardTitle className="text-2xl mt-4">¡Bienvenido! Vamos a empezar.</CardTitle>
-            <CardDescription>
-              Para comenzar, dale un nombre a tu espacio de trabajo. Este será el nombre de tu estudio o salón.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="tenantName">Nombre del Estudio</Label>
-                <Input
-                  id="tenantName"
-                  name="tenantName"
-                  placeholder="Ej: Estudio Belleza Total"
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Crear mi Estudio"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
+    );
 }

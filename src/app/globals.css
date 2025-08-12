@@ -1,101 +1,79 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 280 60% 97%; /* Very light lavender */
-    --foreground: 276 56% 25%; /* Darker purple for text */
-    
-    --card: 0 0% 100%;
-    --card-foreground: 276 56% 25%;
-    
-    --popover: 0 0% 100%;
-    --popover-foreground: 276 56% 25%;
-    
-    --primary: 276 56% 35%; /* Deep Plum */
-    --primary-foreground: 0 0% 100%;
-    
-    --secondary: 280 50% 92%;
-    --secondary-foreground: 276 56% 35%;
-    
-    --muted: 280 30% 90%;
-    --muted-foreground: 276 30% 45%;
-    
-    --accent: 330 80% 58%; /* Dusty Rose / Pink Accent */
-    --accent-foreground: 0 0% 100%;
-    
+    /* Based on blueprint.md */
+    --background: 276 44% 95%; /* Light Lavender */
+    --foreground: 271 76% 15%; /* Dark Plum for text */
+
+    --card: 276 44% 100%; /* White cards */
+    --card-foreground: 271 76% 15%;
+ 
+    --popover: 276 44% 100%;
+    --popover-foreground: 271 76% 15%;
+ 
+    --primary: 271 76% 31%; /* Deep Plum */
+    --primary-foreground: 0 0% 98%;
+ 
+    --secondary: 276 44% 90%; /* Lighter Lavender */
+    --secondary-foreground: 271 76% 31%;
+ 
+    --muted: 276 44% 90%;
+    --muted-foreground: 271 76% 40%;
+ 
+    --accent: 333 100% 53%; /* Dusty Rose / Pink for CTA */
+    --accent-foreground: 0 0% 98%;
+ 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    
-    --border: 280 20% 88%;
-    --input: 280 20% 94%;
-    --ring: 276 56% 35%;
-    
+
+    --border: 276 44% 85%;
+    --input: 276 44% 90%;
+    --ring: 271 76% 31%;
+ 
     --radius: 0.5rem;
 
-    --chart-1: 276 56% 45%;
-    --chart-2: 330 70% 65%;
-    --chart-3: 290 60% 55%;
-    --chart-4: 340 80% 70%;
-    --chart-5: 260 50% 60%;
-
-    --sidebar-background: 276 56% 20%;
-    --sidebar-foreground: 280 60% 97%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 276 56% 20%;
-    --sidebar-accent: 276 56% 35%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 276 56% 25%;
-    --sidebar-ring: 330 80% 58%;
+    /* Custom Sidebar Colors */
+    --sidebar: 271 76% 18%; /* Darker Plum */
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 333 100% 70%; /* Brighter Pink for highlights */
   }
-
+ 
   .dark {
-    --background: 276 15% 15%;
-    --foreground: 280 60% 97%;
-    
-    --card: 276 15% 18%;
-    --card-foreground: 280 60% 97%;
-    
-    --popover: 276 15% 12%;
-    --popover-foreground: 280 60% 97%;
-    
-    --primary: 276 66% 65%;
-    --primary-foreground: 276 15% 15%;
-    
-    --secondary: 276 20% 25%;
-    --secondary-foreground: 280 60% 97%;
-    
-    --muted: 276 20% 25%;
-    --muted-foreground: 280 40% 75%;
-    
-    --accent: 330 80% 68%;
-    --accent-foreground: 276 15% 15%;
-    
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    
-    --border: 276 15% 25%;
-    --input: 276 15% 25%;
-    --ring: 276 66% 65%;
-    
-    --chart-1: 276 66% 65%;
-    --chart-2: 330 80% 68%;
-    --chart-3: 290 70% 75%;
-    --chart-4: 340 90% 80%;
-    --chart-5: 260 60% 70%;
+    /* Dark Theme adjusted from blueprint */
+    --background: 271 76% 5%;
+    --foreground: 0 0% 98%;
 
-    --sidebar-background: 276 15% 12%;
-    --sidebar-foreground: 280 60% 97%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 276 15% 12%;
-    --sidebar-accent: 276 25% 28%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 276 15% 20%;
-    --sidebar-ring: 330 80% 68%;
+    --card: 271 76% 8%;
+    --card-foreground: 0 0% 98%;
+ 
+    --popover: 271 76% 8%;
+    --popover-foreground: 0 0% 98%;
+ 
+    --primary: 333 100% 70%;
+    --primary-foreground: 271 76% 10%;
+ 
+    --secondary: 271 76% 15%;
+    --secondary-foreground: 0 0% 98%;
+ 
+    --muted: 271 76% 15%;
+    --muted-foreground: 271 76% 60%;
+ 
+    --accent: 333 100% 53%;
+    --accent-foreground: 0 0% 98%;
+ 
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 271 76% 15%;
+    --input: 271 76% 15%;
+    --ring: 333 100% 53%;
   }
 }
-
+ 
 @layer base {
   * {
     @apply border-border;

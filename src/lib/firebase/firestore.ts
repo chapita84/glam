@@ -1,31 +1,33 @@
 
 import { db } from './config';
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import type { Role, Permission } from '@/app/(app)/layout';
-import type { BudgetItem as AIBudgetItem } from '@/app/(app)/budgets/actions';
+import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Role, Permission } from '@/lib/types';
 
-// This is a temporary function to get all permission IDs for the owner role.
+// Helper to get all permission IDs
 const getAllPermissionIds = (permissions: Permission[]): string[] => {
-    let ids: string[] = [];
-    permissions.forEach(p => {
-        ids.push(p.id);
-        if (p.children) {
-            ids = ids.concat(getAllPermissionIds(p.children));
-        }
-    });
-    return ids;
+    return permissions.flatMap(p => [p.id, ...(p.children ? getAllPermissionIds(p.children) : [])]);
 };
 
+// =================================================================
+// Type Definitions
+// =================================================================
 
-// Type for role data stored in Firestore
-type RoleFirestoreData = {
+export type Studio = {
     id: string;
     name: string;
-    permissions: string[]; // Stored as an array of strings
-}
+    ownerId: string;
+    logoUrl?: string;
+    createdAt: any;
+    location?: string;
+    phone?: string;
+    description?: string;
+};
+
+type RoleFirestoreData = Omit<Role, 'permissions'> & { permissions: string[] };
 
 export type StaffMember = {
-  id: string; // Corresponds to userId
+  id: string;
   name: string;
   email: string;
   roleId: string;
@@ -37,545 +39,289 @@ export type Service = {
   id: string;
   name: string;
   category: string;
-  duration: number; // in minutes
+  duration: number;
   price: number;
 }
 
-export type Client = {
+export type Booking = { id: string; clientId: string; clientName: string; staffId: string; staffName: string; serviceId: string; serviceName: string; duration: number; startTime: Date; endTime: Date; status: 'confirmed' | 'completed' | 'canceled_by_user' | 'canceled_by_studio' | 'no_show'; price: { amount: number; currency: string; }; createdAt?: any; notes?: string; }
+export type Budget = { id?: string; budgetName: string; clientName: string; status: 'draft' | 'sent' | 'approved' | 'rejected'; createdAt?: any; updatedAt?: any; eventInfo: any; items: any[]; summary: any; totalDuration?: number; }
+export type WorkingHour = { dayOfWeek: number; startTime: string; endTime: string; enabled: boolean; }
+export type StudioConfig = { workingHours: WorkingHour[]; }
+export type TimeBlock = {
     id: string;
-    name: string;
-    email: string;
-    phone: string;
-}
-
-export type Booking = {
-    id?: string; // bookingId, optional for creation
-    clientId: string;
-    clientName: string;
-    staffId: string;
-    staffName: string;
-    serviceId: string;
-    serviceName: string;
-    duration: number; // in minutes
     startTime: Date;
     endTime: Date;
-    status: 'confirmed' | 'completed' | 'canceled_by_user' | 'canceled_by_tenant' | 'no_show';
-    price: {
-        amount: number;
-        currency: string;
-    };
+    reason: string; // e.g., 'Vacation', 'Personal', 'Event'
+    isAllDay: boolean;
     createdAt?: any;
-    notes?: string;
 }
+
 
 // =================================================================
-// Budget Module Types (New Specification)
+// Initial Data Seeding for a NEW Studio
 // =================================================================
 
-export type EventInfo = {
-    type: string;
-    date: string; // ISO string date
-    time: string; // "HH:mm"
-    location: string;
-};
-
-export type BudgetItem = {
-    description: string;
-    category: string;
-    quantity: number;
-    unitCost: {
-        amount: number;
-        currency: 'USD' | 'ARS';
-    };
-    duration?: number; // duration per unit in minutes
-};
-
-export type Summary = {
-    subtotal: number;
-    logistics: number;
-    totalUSD: number;
-    exchangeRate: number;
-    totalARS: number;
-};
-
-export type Budget = {
-    id?: string;
-    budgetName: string;
-    clientName: string;
-    status: 'draft' | 'sent' | 'approved' | 'rejected';
-    createdAt?: any;
-    updatedAt?: any;
-    eventInfo: EventInfo;
-    items: BudgetItem[];
-    summary: Summary;
-    totalDuration?: number; // Calculated field, useful for booking
-}
-
-// =================================================================
-
-
-export type WorkingHour = {
-    dayOfWeek: number; // 0 (Sunday) to 6 (Saturday)
-    startTime: string; // "HH:mm"
-    endTime: string;   // "HH:mm"
-    enabled: boolean;
-}
-
-export type TenantConfig = {
-    workingHours: WorkingHour[];
-}
-
-const defaultWorkingHours: WorkingHour[] = [
-    { dayOfWeek: 1, startTime: '09:00', endTime: '18:00', enabled: true },
-    { dayOfWeek: 2, startTime: '09:00', endTime: '18:00', enabled: true },
-    { dayOfWeek: 3, startTime: '09:00', endTime: '18:00', enabled: true },
-    { dayOfWeek: 4, startTime: '09:00', endTime: '18:00', enabled: true },
-    { dayOfWeek: 5, startTime: '09:00', endTime: '18:00', enabled: true },
-    { dayOfWeek: 6, startTime: '09:00', endTime: '14:00', enabled: false },
-    { dayOfWeek: 0, startTime: '09:00', endTime: '14:00', enabled: false },
-].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-
-/**
- * Fetches the configuration for a given tenant from Firestore.
- * @param tenantId The ID of the tenant.
- * @returns A promise that resolves to the TenantConfig object or null.
- */
-export async function getTenantConfig(tenantId: string): Promise<TenantConfig | null> {
-    const configDocRef = doc(db, 'tenants', tenantId);
-    try {
-        const docSnap = await getDoc(configDocRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            // Correctly access nested config object
-            const workingHours = data.config?.workingHours;
-            if (workingHours) {
-                return {
-                    workingHours: workingHours.sort((a: WorkingHour, b: WorkingHour) => a.dayOfWeek - b.dayOfWeek),
-                };
-            }
-        }
-        // If doc doesn't exist or has no config, return defaults
-        return { workingHours: defaultWorkingHours };
-    } catch (error) {
-        console.error("Error fetching tenant config: ", error);
-        return { workingHours: defaultWorkingHours };
-    }
-}
-
-/**
- * Updates the configuration for a given tenant in Firestore.
- * @param tenantId The ID of the tenant.
- * @param config The new configuration object.
- */
-export async function updateTenantConfig(tenantId: string, config: TenantConfig): Promise<void> {
-    const configDocRef = doc(db, 'tenants', tenantId);
-    try {
-        // Ensure we are saving into the nested 'config' object
-        const configToSave = {
-            ...config,
-            workingHours: [...config.workingHours].sort((a,b) => {
-                const dayA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
-                const dayB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
-                return dayA - dayB;
-            })
-        };
-        await setDoc(configDocRef, { config: configToSave }, { merge: true });
-        console.log("Tenant config updated successfully.");
-    } catch (error) {
-        console.error("Error updating tenant config: ", error);
-        throw error;
-    }
-}
-
-
-/**
- * Fetches all roles for a given tenant from Firestore.
- * If no roles exist, it seeds a default "Owner" role.
- * @param tenantId The ID of the tenant.
- * @returns A promise that resolves to an array of Role objects.
- */
-export async function getRoles(tenantId: string): Promise<Role[]> {
-    const rolesCollectionRef = collection(db, 'tenants', tenantId, 'roles');
-    try {
-        const querySnapshot = await getDocs(rolesCollectionRef);
-        let roles: Role[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data() as RoleFirestoreData;
-            roles.push({
-                id: data.id,
-                name: data.name,
-                permissions: new Set(data.permissions || []),
-            });
-        });
-
-        if (roles.length === 0) {
-            console.log("No roles found, seeding 'Propietario' role...");
-            const allPermissions: Permission[] = [
-                { id: "agenda", label: "Agenda", children: [{ id: "agenda_view", label: "Ver" }, { id: "agenda_manage", label: "Gestionar" }] },
-                { id: "management", label: "Gestión", children: [{ id: "services_manage", label: "Gestionar Servicios" }, { id: "staff_manage", label: "Gestionar Personal" }, { id: "budgets_manage", label: "Gestionar Presupuestos" }] },
-                { id: "config", label: "Configuración", children: [{ id: "roles_manage", label: "Gestionar Roles" }, { id: "settings_manage", label: "Gestionar Ajustes" }, { id: "billing_manage", label: "Gestionar Facturación" }] },
-                { id: "reports_view", label: "Ver Reportes" },
-            ];
-            const ownerRole = {
-                id: 'owner',
-                name: 'Propietario',
-                permissions: getAllPermissionIds(allPermissions),
-            };
-            await addOrUpdateRole(tenantId, ownerRole);
-            roles.push({ ...ownerRole, permissions: new Set(ownerRole.permissions) });
-        }
-
-        return roles;
-    } catch (error) {
-        console.error("Error fetching roles: ", error);
-        return [];
-    }
-}
-
-/**
- * Adds a new role or updates an existing one in Firestore.
- * @param tenantId The ID of the tenant.
- * @param role The role object to add or update. The id will be used as the document ID.
- */
-export async function addOrUpdateRole(tenantId: string, role: {id: string, name: string, permissions: string[] | Set<string>}): Promise<void> {
-    const roleDocRef = doc(db, 'tenants', tenantId, 'roles', role.id);
-    const roleData: RoleFirestoreData = {
-        id: role.id,
-        name: role.name,
-        permissions: Array.isArray(role.permissions) ? role.permissions : Array.from(role.permissions),
-    }
-    try {
-        await setDoc(roleDocRef, roleData, { merge: true });
-        console.log("Role saved successfully: ", role.id);
-    } catch (error) {
-        console.error("Error saving role: ", error);
-    }
-}
-
-
-/**
- * Deletes a role from Firestore.
- * @param tenantId The ID of the tenant.
- * @param roleId The ID of the role to delete.
- */
-export async function deleteRole(tenantId: string, roleId: string): Promise<void> {
-    const roleDocRef = doc(db, 'tenants', tenantId, 'roles', roleId);
-    try {
-        await deleteDoc(roleDocRef);
-        console.log("Role deleted successfully: ", roleId);
-    } catch (error) {
-        console.error("Error deleting role: ", error);
-    }
-}
-
-/**
- * Fetches all staff members for a given tenant from Firestore.
- * If no staff members exist, it seeds a default "Admin" user.
- */
-export async function getStaff(tenantId: string): Promise<StaffMember[]> {
-    const staffCollectionRef = collection(db, 'tenants', tenantId, 'staff');
-    try {
-        const querySnapshot = await getDocs(staffCollectionRef);
-        const staff = querySnapshot.docs.map(doc => doc.data() as StaffMember);
-        
-        if (staff.length === 0) {
-            console.log("No staff found, seeding default admin user...");
-            const adminUser = {
-                id: 'admin@example.com',
-                name: 'Admin User',
-                email: 'admin@example.com',
-                roleId: 'owner',
-            };
-            await addOrUpdateStaffMember(tenantId, adminUser);
-            staff.push(adminUser);
-        }
-        
-        return staff;
-    } catch (error) {
-        console.error("Error fetching staff: ", error);
-        return [];
-    }
-}
-
-/**
- * Adds or updates a staff member in Firestore.
- */
-export async function addOrUpdateStaffMember(tenantId: string, member: Omit<StaffMember, 'joinedAt' | 'avatar'>): Promise<void> {
-    const staffDocRef = doc(db, 'tenants', tenantId, 'staff', member.id);
-    try {
-        // We simulate the full object here, in a real scenario the userId would be from Auth
-        const memberData = {
-            ...member,
-            joinedAt: serverTimestamp() // Use server timestamp for consistency
-        }
-        await setDoc(staffDocRef, memberData, { merge: true });
-        console.log("Staff member saved successfully: ", member.id);
-    } catch (error) {
-        console.error("Error saving staff member: ", error);
-    }
-}
-
-/**
- * Deletes a staff member from Firestore.
- */
-export async function deleteStaffMember(tenantId: string, userId: string): Promise<void> {
-    const staffDocRef = doc(db, 'tenants', tenantId, 'staff', userId);
-    try {
-        await deleteDoc(staffDocRef);
-        console.log("Staff member deleted successfully: ", userId);
-    } catch (error) {
-        console.error("Error deleting staff member: ", error);
-    }
-}
-
-/**
- * Fetches all services for a given tenant from Firestore.
- * If no services exist, it seeds some example services.
- */
-export async function getServices(tenantId: string): Promise<Service[]> {
-    const servicesCollectionRef = collection(db, 'tenants', tenantId, 'services');
-    try {
-        const querySnapshot = await getDocs(servicesCollectionRef);
-        const services = querySnapshot.docs.map(doc => doc.data() as Service);
-
-        if (services.length === 0) {
-            console.log("No services found, seeding example services...");
-            const defaultServices: Service[] = [
-                { id: 'corte-de-pelo', name: 'Corte de Cabello', category: 'Peluquería', duration: 60, price: 50 },
-                { id: 'manicura-clasica', name: 'Manicura Clásica', category: 'Uñas', duration: 30, price: 25 },
-                { id: 'maquillaje', name: 'Maquillaje', category: 'Maquillaje', duration: 90, price: 75 },
-            ];
-            for (const service of defaultServices) {
-                await addOrUpdateService(tenantId, service);
-                services.push(service);
-            }
-        }
-        return services;
-    } catch (error) {
-        console.error("Error fetching services: ", error);
-        return [];
-    }
-}
-
-/**
- * Adds or updates a service in Firestore.
- */
-export async function addOrUpdateService(tenantId: string, service: Service): Promise<void> {
-    const serviceDocRef = doc(db, 'tenants', tenantId, 'services', service.id);
-    try {
-        await setDoc(serviceDocRef, service, { merge: true });
-        console.log("Service saved successfully: ", service.id);
-    } catch (error) {
-        console.error("Error saving service: ", error);
-    }
-}
-
-/**
- * Deletes a service from Firestore.
- */
-export async function deleteService(tenantId: string, serviceId: string): Promise<void> {
-    const serviceDocRef = doc(db, 'tenants', tenantId, 'services', serviceId);
-    try {
-        await deleteDoc(serviceDocRef);
-        console.log("Service deleted successfully: ", serviceId);
-    } catch (error) {
-        console.error("Error deleting service: ", error);
-    }
-}
-
-
-/**
- * Fetches all bookings for a given tenant from Firestore.
- * @param tenantId The ID of the tenant.
- * @returns A promise that resolves to an array of Booking objects.
- */
-export async function getBookings(tenantId: string): Promise<Booking[]> {
-    if (!tenantId) {
-        console.log("getBookings called without a tenantId, returning empty array.");
-        return [];
-    }
-    const bookingsCollectionRef = collection(db, 'tenants', tenantId, 'bookings');
-    try {
-        const querySnapshot = await getDocs(bookingsCollectionRef);
-        const bookings = querySnapshot.docs.map((doc) => {
-            const data = doc.data();
-            // Firestore timestamps need to be converted to JS Date objects
-            const startTime = data.startTime?.toDate ? data.startTime.toDate() : new Date();
-            const endTime = new Date(startTime.getTime() + data.duration * 60000);
-            return {
-                ...data,
-                id: doc.id,
-                startTime: startTime,
-                endTime: endTime,
-            } as Booking;
-        });
-
-        // Seed a booking if none exist, using seeded data
-        if (bookings.length === 0) {
-            console.log("No bookings found, attempting to seed an example booking...");
-             const today = new Date();
-             const startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 14, 0, 0); // Today at 2 PM
-
-            const newBooking: Omit<Booking, 'id' | 'createdAt' | 'endTime'> = {
-                clientName: "Cliente de Ejemplo",
-                clientId: 'example-client',
-                staffId: 'admin@example.com',
-                staffName: "Admin User",
-                serviceId: 'corte-de-pelo',
-                serviceName: 'Corte de Cabello',
-                duration: 60,
-                startTime: startTime,
-                status: 'confirmed',
-                price: { amount: 50, currency: 'USD' },
-                notes: 'Cita autogenerada de ejemplo.',
-            };
-            await addOrUpdateBooking(tenantId, newBooking);
-            // We can just return the newly created booking to show it immediately
-            return [{...newBooking, id: 'seeded-booking', endTime: new Date(startTime.getTime() + 60 * 60000)}];
-        }
-
-        return bookings;
-    } catch (error) {
-        console.error("Error fetching bookings: ", error);
-        return [];
-    }
-}
-
-/**
- * Adds a new booking or updates an existing one in Firestore.
- * @param tenantId The ID of the tenant.
- * @param booking The booking object to add or update.
- */
-export async function addOrUpdateBooking(tenantId: string, booking: Omit<Booking, 'createdAt' | 'endTime'> & { id?: string }): Promise<void> {
-    // If no id is provided, a new one will be generated automatically by Firestore
-    const bookingDocRef = booking.id 
-        ? doc(db, 'tenants', tenantId, 'bookings', booking.id)
-        : doc(collection(db, 'tenants', tenantId, 'bookings'));
+async function seedInitialDataForStudio(studioId: string, owner: { uid: string, email?: string | null, displayName?: string | null }) {
+    console.log(`Seeding initial data for new studio: ${studioId}`);
     
-    const bookingData = {
-        ...booking,
-        id: bookingDocRef.id,
+    const allPermissions: Permission[] = [
+        { id: "agenda", label: "Agenda", children: [{ id: "agenda_view", label: "Ver" }, { id: "agenda_manage", label: "Gestionar" }] },
+        { id: "management", label: "Gestión", children: [{ id: "services_manage", label: "Gestionar Servicios" }, { id: "staff_manage", label: "Gestionar Personal" }, { id: "budgets_manage", label: "Gestionar Presupuestos" }, {id: "studios_manage", label: "Gestionar Estudios"}] },
+        { id: "config", label: "Configuración", children: [{ id: "roles_manage", label: "Gestionar Roles" }, { id: "settings_manage", label: "Gestionar Ajustes" }, { id: "billing_manage", label: "Gestionar Facturación" }] },
+        { id: "reports_view", label: "Ver Reportes" },
+    ];
+    const allPermissionIds = getAllPermissionIds(allPermissions);
+    
+    const ownerRole = { id: 'owner', name: 'Propietario', description: 'Rol con permisos para gestionar el estudio.', permissions: allPermissionIds };
+    const superAdminRole = { id: 'super_admin', name: 'Super Admin', description: 'Rol con permisos para gestionar la plataforma.', permissions: allPermissionIds };
+    await addOrUpdateRole(studioId, ownerRole);
+    await addOrUpdateRole(studioId, superAdminRole);
+
+    const ownerStaffMember: StaffMember = {
+        id: owner.uid,
+        name: owner.displayName || 'Super Admin',
+        email: owner.email || 'superadmin@example.com',
+        roleId: 'super_admin',
+    };
+    await addOrUpdateStaffMember(studioId, ownerStaffMember);
+
+    const defaultServices: Service[] = [
+        { id: 'corte-de-pelo', name: 'Corte de Cabello', category: 'Peluquería', duration: 60, price: 50 },
+        { id: 'manicura-clasica', name: 'Manicura Clásica', category: 'Uñas', duration: 30, price: 25 },
+    ];
+    for (const service of defaultServices) {
+        await addOrUpdateService(studioId, service);
+    }
+    
+    console.log(`Finished seeding data for studio: ${studioId}`);
+}
+
+// =================================================================
+// Studio Management (Main Collection)
+// =================================================================
+
+export async function createStudio(studioName: string, owner: { uid: string, email?: string | null, displayName?: string | null }): Promise<string> {
+    const studioDocRef = doc(collection(db, 'studios'));
+    const studioData: Studio = {
+        id: studioDocRef.id,
+        name: studioName,
+        ownerId: owner.uid,
         createdAt: serverTimestamp(),
     };
-
     try {
-        await setDoc(bookingDocRef, bookingData, { merge: true });
-        console.log("Booking saved successfully: ", bookingDocRef.id);
-    } catch (error) {
-        console.error("Error saving booking: ", error);
+        await setDoc(studioDocRef, studioData);
+        await seedInitialDataForStudio(studioDocRef.id, owner);
+        return studioDocRef.id;
+    } catch (error: any) {
+        console.error("Firebase Error creating studio: ", error.code, error.message);
+        // This will give us a clear idea of what's failing, e.g., 'permission-denied'
+        throw new Error(`Failed to create studio: ${error.message}`);
     }
 }
 
-/**
- * Deletes a booking from Firestore.
- * @param tenantId The ID of the tenant.
- * @param bookingId The ID of the booking to delete.
- */
-export async function deleteBooking(tenantId: string, bookingId: string): Promise<void> {
-    const bookingDocRef = doc(db, 'tenants', tenantId, 'bookings', bookingId);
-    try {
-        await deleteDoc(bookingDocRef);
-        console.log("Booking deleted successfully: ", bookingId);
-    } catch (error) {
-        console.error("Error deleting booking: ", error);
-    }
-}
-
-/**
- * Fetches all budgets for a given tenant from Firestore.
- */
-export async function getBudgets(tenantId: string): Promise<Budget[]> {
-    if (!tenantId) return [];
-    const budgetsCollectionRef = collection(db, 'tenants', tenantId, 'budgets');
-    const q = query(budgetsCollectionRef, orderBy('createdAt', 'desc'));
+export async function getStudioForUser(userId: string): Promise<Studio | null> {
+    const q = query(collection(db, 'studios'), where('ownerId', '==', userId));
     try {
         const querySnapshot = await getDocs(q);
-        const budgets = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
-
-        if (budgets.length === 0) {
-            console.log("No budgets found, seeding example budget...");
-            const today = new Date();
-            const eventDate = new Date(today.setDate(today.getDate() + 14)); // 2 weeks from now
-
-            const newBudget: Budget = {
-                budgetName: "Presupuesto Boda - Cliente Ejemplo",
-                clientName: "Cliente de Ejemplo",
-                status: 'draft',
-                eventInfo: {
-                    type: "Boda",
-                    date: eventDate.toISOString().split('T')[0],
-                    time: "17:00",
-                    location: "Salón de Fiestas 'El Roble'",
-                },
-                items: [
-                    { description: "Maquillaje de Novia", category: "Maquillaje", quantity: 1, unitCost: { amount: 250, currency: 'USD' }, duration: 120 },
-                    { description: "Peinado de Novia", category: "Peluquería", quantity: 1, unitCost: { amount: 200, currency: 'USD' }, duration: 90 },
-                ],
-                summary: {
-                    subtotal: 450,
-                    logistics: 100,
-                    totalUSD: 550,
-                    exchangeRate: 900,
-                    totalARS: 550 * 900,
-                },
-                totalDuration: 210,
-            };
-            const newBudgetId = await addOrUpdateBudget(tenantId, newBudget);
-            return [{...newBudget, id: newBudgetId}];
+        if (!querySnapshot.empty) {
+            return querySnapshot.docs[0].data() as Studio;
         }
-
-        return budgets;
+        return null;
     } catch (error) {
-        console.error("Error fetching budgets: ", error);
+        console.error("Error fetching studio for user: ", error);
+        return null;
+    }
+}
+
+export async function getAllStudios(): Promise<Studio[]> {
+    try {
+        const q = query(collection(db, 'studios'), orderBy('name'));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => doc.data() as Studio);
+    } catch (error) {
+        console.error("Error fetching all studios: ", error);
         return [];
     }
 }
 
-/**
- * Adds or updates a budget in Firestore.
- * @returns The ID of the saved budget.
- */
-export async function addOrUpdateBudget(tenantId: string, budget: Omit<Budget, 'createdAt'|'updatedAt'> & {id?: string}): Promise<string> {
-    const budgetDocRef = budget.id
-        ? doc(db, 'tenants', tenantId, 'budgets', budget.id)
-        : doc(collection(db, 'tenants', tenantId, 'budgets'));
-    
-    const budgetData = {
-        ...budget,
-        id: budgetDocRef.id,
-        updatedAt: serverTimestamp(),
-    };
-
-    // Set createdAt only if it's a new document
-    const finalData: any = { ...budgetData };
-    if (!budget.id) {
-        finalData.createdAt = serverTimestamp();
-    }
-
-
+export async function updateStudio(studioId: string, data: Partial<Omit<Studio, 'id'>>): Promise<void> {
+    const studioDocRef = doc(db, 'studios', studioId);
     try {
-        await setDoc(budgetDocRef, finalData, { merge: true });
-        console.log("Budget saved successfully: ", budgetDocRef.id);
-        return budgetDocRef.id;
+        await updateDoc(studioDocRef, data);
     } catch (error) {
-        console.error("Error saving budget: ", error);
+        console.error("Error updating studio: ", error);
         throw error;
     }
 }
 
-/**
- * Deletes a budget from Firestore.
- */
-export async function deleteBudget(tenantId: string, budgetId: string): Promise<void> {
-    const budgetDocRef = doc(db, 'tenants', tenantId, 'budgets', budgetId);
+// =================================================================
+// Subcollection Management (Roles, Staff, Services, etc. under a specific Studio)
+// =================================================================
+
+export async function getRoles(studioId: string): Promise<Role[]> {
+    const rolesCollectionRef = collection(db, 'studios', studioId, 'roles');
+    const querySnapshot = await getDocs(rolesCollectionRef);
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data() as RoleFirestoreData;
+        return { ...data, permissions: new Set(data.permissions || []) };
+    });
+}
+
+export async function addOrUpdateRole(studioId: string, role: Omit<Role, 'permissions'> & { permissions: Set<string> | string[] }): Promise<void> {
+    const roleDocRef = doc(db, 'studios', studioId, 'roles', role.id);
+    const roleData: RoleFirestoreData = { ...role, permissions: Array.from(role.permissions) };
+    await setDoc(roleDocRef, roleData, { merge: true });
+}
+
+export async function deleteRole(studioId: string, roleId: string): Promise<void> {
     try {
-        await deleteDoc(budgetDocRef);
-        console.log("Budget deleted successfully: ", budgetId);
+        await deleteDoc(doc(db, 'studios', studioId, 'roles', roleId));
     } catch (error) {
-        console.error("Error deleting budget: ", error);
+        console.error(`Failed to delete role ${roleId} from studio ${studioId}:`, error);
+        throw error;
     }
 }
 
-    
+export async function getStaff(studioId: string): Promise<StaffMember[]> {
+    const staffCollectionRef = collection(db, 'studios', studioId, 'staff');
+    const querySnapshot = await getDocs(staffCollectionRef);
+    return querySnapshot.docs.map(doc => doc.data() as StaffMember);
+}
 
-    
+export async function addOrUpdateStaffMember(studioId: string, member: Omit<StaffMember, 'joinedAt'>): Promise<void> {
+    const staffDocRef = doc(db, 'studios', studioId, 'staff', member.id);
+    await setDoc(staffDocRef, { ...member, joinedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function deleteStaffMember(studioId: string, userId: string): Promise<void> {
+    try {
+        await deleteDoc(doc(db, 'studios', studioId, 'staff', userId));
+    } catch (error) {
+        console.error(`Failed to delete staff member ${userId} from studio ${studioId}:`, error);
+        throw error;
+    }
+}
+
+export async function getServices(studioId: string): Promise<Service[]> {
+    const servicesCollectionRef = collection(db, 'studios', studioId, 'services');
+    const querySnapshot = await getDocs(servicesCollectionRef);
+    return querySnapshot.docs.map(doc => doc.data() as Service);
+}
+
+export async function addOrUpdateService(studioId: string, service: Service): Promise<void> {
+    await setDoc(doc(db, 'studios', studioId, 'services', service.id), service, { merge: true });
+}
+
+export async function deleteService(studioId: string, serviceId: string): Promise<void> {
+    try {
+        await deleteDoc(doc(db, 'studios', studioId, 'services', serviceId));
+    } catch (error) {
+        console.error(`Failed to delete service ${serviceId} from studio ${studioId}:`, error);
+        throw error;
+    }
+}
+
+export async function getBookings(studioId: string): Promise<Booking[]> {
+    const bookingsCollectionRef = collection(db, 'studios', studioId, 'bookings');
+    const querySnapshot = await getDocs(bookingsCollectionRef);
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const startTime = data.startTime?.toDate ? data.startTime.toDate() : new Date();
+        return {
+            ...data,
+            id: doc.id,
+            startTime,
+            endTime: new Date(startTime.getTime() + data.duration * 60000),
+        } as Booking;
+    });
+}
+
+export async function addOrUpdateBooking(studioId: string, booking: Omit<Booking, 'id' | 'createdAt' | 'endTime'> & { id?: string }): Promise<void> {
+    const docRef = booking.id ? doc(db, 'studios', studioId, 'bookings', booking.id) : doc(collection(db, 'studios', studioId, 'bookings'));
+    const bookingData = { ...booking, id: docRef.id, createdAt: serverTimestamp() };
+    await setDoc(docRef, bookingData, { merge: true });
+}
+
+export async function deleteBooking(studioId: string, bookingId: string): Promise<void> {
+    try {
+        await deleteDoc(doc(db, 'studios', studioId, 'bookings', bookingId));
+    } catch (error) {
+        console.error(`Failed to delete booking ${bookingId} from studio ${studioId}:`, error);
+        throw error;
+    }
+}
+
+export async function getBudgets(studioId: string): Promise<Budget[]> {
+    const budgetsCollectionRef = collection(db, 'studios', studioId, 'budgets');
+    const q = query(budgetsCollectionRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
+}
+
+export async function addOrUpdateBudget(studioId: string, budget: Omit<Budget, 'id'|'createdAt'|'updatedAt'> & {id?: string}): Promise<string> {
+    const docRef = budget.id ? doc(db, 'studios', studioId, 'budgets', budget.id) : doc(collection(db, 'studios', studioId, 'budgets'));
+    const budgetData = { ...budget, id: docRef.id, updatedAt: serverTimestamp() } as any;
+    if (!budget.id) {
+        budgetData.createdAt = serverTimestamp();
+    }
+    await setDoc(docRef, budgetData, { merge: true });
+    return docRef.id;
+}
+
+export async function deleteBudget(studioId: string, budgetId: string): Promise<void> {
+    try {
+        await deleteDoc(doc(db, 'studios', studioId, 'budgets', budgetId));
+    } catch (error) {
+        console.error(`Failed to delete budget ${budgetId} from studio ${studioId}:`, error);
+        throw error;
+    }
+}
+
+export async function getStudioConfig(studioId: string): Promise<StudioConfig | null> {
+    const configDocRef = doc(db, 'studios', studioId);
+    const docSnap = await getDoc(configDocRef);
+    const data = docSnap.data() as { config?: StudioConfig };
+    return data?.config || null;
+}
+
+export async function updateStudioConfig(studioId: string, config: StudioConfig): Promise<void> {
+    await setDoc(doc(db, 'studios', studioId), { config }, { merge: true });
+}
+
+export async function uploadFile(file: File, path: string): Promise<string> {
+    const storage = getStorage();
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+}
+
+export async function getTimeBlocks(studioId: string, start: Date, end: Date): Promise<TimeBlock[]> {
+    const timeBlocksCollectionRef = collection(db, 'studios', studioId, 'timeblocks');
+    const q = query(timeBlocksCollectionRef, where('startTime', '>=', start), where('startTime', '<=', end));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            startTime: data.startTime.toDate(),
+            endTime: data.endTime.toDate(),
+            reason: data.reason,
+            isAllDay: data.isAllDay
+        } as TimeBlock;
+    });
+}
+
+export async function addOrUpdateTimeBlock(studioId: string, block: Omit<TimeBlock, 'id' | 'createdAt'> & { id?: string }): Promise<void> {
+    const docRef = block.id ? doc(db, 'studios', studioId, 'timeblocks', block.id) : doc(collection(db, 'studios', studioId, 'timeblocks'));
+    const blockData = { ...block, id: docRef.id, createdAt: serverTimestamp() };
+    await setDoc(docRef, blockData, { merge: true });
+}
+
+export async function deleteTimeBlock(studioId: string, blockId: string): Promise<void> {
+    try {
+        await deleteDoc(doc(db, 'studios', studioId, 'timeblocks', blockId));
+    } catch (error) {
+        console.error(`Failed to delete time block ${blockId} from studio ${studioId}:`, error);
+        throw error;
+    }
+}

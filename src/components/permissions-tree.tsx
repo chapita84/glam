@@ -1,138 +1,127 @@
 
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { type Permission } from '@/app/(app)/layout';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Save } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import type { Permission } from '@/app/(app)/layout';
+import { Button } from './ui/button';
 
 interface PermissionsTreeProps {
   permissions: Permission[];
-  rolePermissions?: Set<string>;
+  rolePermissions: Set<string>;
   onPermissionsChange: (newPermissions: Set<string>) => void;
 }
 
+const getAllPermissionIds = (permissions: Permission[]): string[] => {
+  return permissions.flatMap(p => [p.id, ...(p.children ? getAllPermissionIds(p.children) : [])]);
+};
+
+const PermissionNode = ({ permission, rolePermissions, onToggle, level = 0 }: { permission: Permission, rolePermissions: Set<string>, onToggle: (id: string, checked: boolean) => void, level?: number }) => {
+  const isChecked = rolePermissions.has(permission.id);
+  
+  const childrenIds = permission.children ? getAllPermissionIds(permission.children) : [];
+  const areAllChildrenChecked = childrenIds.length > 0 && childrenIds.every(id => rolePermissions.has(id));
+  
+  // A parent is 'checked' if itself OR all its children are checked.
+  const finalIsChecked = isChecked || areAllChildrenChecked;
+
+  return (
+    <div className="relative">
+      <div className="flex items-center space-x-2">
+        <div style={{ paddingLeft: `${level * 1.5}rem` }} className="flex items-center space-x-2 flex-grow">
+           {level > 0 && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-px bg-border" style={{ left: `${(level - 1) * 1.5 + 0.5}rem`}}></span>}
+           <Checkbox
+            id={permission.id}
+            checked={finalIsChecked}
+            onCheckedChange={(checked) => onToggle(permission.id, !!checked)}
+          />
+          <Label htmlFor={permission.id} className="font-normal cursor-pointer">
+            {permission.label}
+          </Label>
+        </div>
+      </div>
+      {permission.children && (
+        <div className="relative mt-2 pl-6 border-l border-dashed border-border">
+          {permission.children.map((child) => (
+            <div key={child.id} className="mt-2">
+              <PermissionNode 
+                permission={child} 
+                rolePermissions={rolePermissions}
+                onToggle={onToggle}
+                level={level + 1}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function PermissionsTree({ permissions, rolePermissions, onPermissionsChange }: PermissionsTreeProps) {
-  const [checkedPermissions, setCheckedPermissions] = useState(new Set(rolePermissions));
-  const [isSaving, setIsSaving] = useState(false);
+  
+  const allPermissionIds = useMemo(() => getAllPermissionIds(permissions), [permissions]);
 
-  // Sync state if the selected role (and its permissions) changes
-  useEffect(() => {
-    setCheckedPermissions(new Set(rolePermissions));
-  }, [rolePermissions]);
+  const handleToggle = (permissionId: string, checked: boolean) => {
+    const newPermissions = new Set(rolePermissions);
+    const permission = findPermissionById(permissions, permissionId);
+    const childrenIds = permission && permission.children ? getAllPermissionIds(permission.children) : [];
 
-  const getChildPermissionIds = (permission: Permission): string[] => {
-    let ids: string[] = [];
-    if (permission.children) {
-      permission.children.forEach(child => {
-        ids.push(child.id);
-        ids = ids.concat(getChildPermissionIds(child));
-      });
+    const toggle = (id: string, check: boolean) => {
+        if(check) newPermissions.add(id);
+        else newPermissions.delete(id);
     }
-    return ids;
-  };
 
-  const findPermissionAndParent = (perms: Permission[], id: string, parent?: Permission): { p: Permission, parent: Permission | undefined } | null => {
-      for (const p of perms) {
-          if (p.id === id) return { p, parent };
+    toggle(permissionId, checked);
+    childrenIds.forEach(id => toggle(id, checked));
+    
+    onPermissionsChange(newPermissions);
+  };
+  
+  const findPermissionById = (permissions: Permission[], id: string): Permission | null => {
+      for (const p of permissions) {
+          if (p.id === id) return p;
           if (p.children) {
-              const found = findPermissionAndParent(p.children, id, p);
+              const found = findPermissionById(p.children, id);
               if (found) return found;
           }
       }
       return null;
   }
 
-  const handleCheckChange = (permissionId: string, isChecked: boolean) => {
-    const newChecked = new Set(checkedPermissions);
-    const permissionInfo = findPermissionAndParent(permissions, permissionId);
-
-    if (!permissionInfo) return;
-    
-    // Update self and all children
-    const updateChildren = (perm: Permission, check: boolean) => {
-        const childIds = getChildPermissionIds(perm);
-        [perm.id, ...childIds].forEach(id => {
-            if (check) newChecked.add(id);
-            else newChecked.delete(id);
-        });
-    };
-    updateChildren(permissionInfo.p, isChecked);
-    
-    // Update parents upwards
-    const updateParents = (id: string) => {
-        const info = findPermissionAndParent(permissions, id);
-        if (info && info.parent) {
-            const parent = info.parent;
-            const parentChildIds = getChildPermissionIds(parent);
-            const allChildrenChecked = parentChildIds.every(cid => newChecked.has(cid));
-
-            if (allChildrenChecked) {
-                newChecked.add(parent.id);
-            } else {
-                newChecked.delete(parent.id);
-            }
-            updateParents(parent.id); // Recurse upwards
-        }
-    };
-    
-    updateParents(permissionId);
-    setCheckedPermissions(newChecked);
-  };
+  const handleSelectAll = () => {
+    onPermissionsChange(new Set(allPermissionIds));
+  }
   
-  const handleSave = async () => {
-    if (!rolePermissions) return;
-    setIsSaving(true);
-    await onPermissionsChange(checkedPermissions);
-    setIsSaving(false);
-  };
-
-  const renderPermission = (permission: Permission, level: number = 0) => {
-    const allChildIds = getChildPermissionIds(permission);
-    const checkedChildrenCount = allChildIds.filter(id => checkedPermissions.has(id)).length;
-    
-    const isChecked = checkedPermissions.has(permission.id) || (allChildIds.length > 0 && checkedChildrenCount === allChildIds.length);
-    const isIndeterminate = allChildIds.length > 0 && checkedChildrenCount > 0 && checkedChildrenCount < allChildIds.length;
-
-    return (
-      <div key={permission.id} style={{ marginLeft: `${level * 20}px` }}>
-        <div className="flex items-center gap-2 py-1">
-          <Checkbox
-            id={permission.id}
-            checked={isChecked}
-            onCheckedChange={(checked) => handleCheckChange(permission.id, !!checked)}
-            aria-checked={isIndeterminate ? 'mixed' : isChecked}
-          />
-          <label htmlFor={permission.id} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            {permission.label}
-          </label>
-        </div>
-        {permission.children && (
-          <div className="border-l-2 border-muted-foreground/20 pl-4">
-            {permission.children.map(child => renderPermission(child, level + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const handleDeselectAll = () => {
+      onPermissionsChange(new Set());
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 pr-4">
-        <div className="space-y-2 py-2">
-            {permissions.map(permission => renderPermission(permission))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+            <h3 className="text-lg font-semibold">Permisos</h3>
+            <p className="text-sm text-muted-foreground">
+              Selecciona los permisos para este rol.
+            </p>
         </div>
-      </ScrollArea>
-      <div className="mt-4 pt-4 border-t">
-        <Button onClick={handleSave} className="w-full" disabled={isSaving || !rolePermissions}>
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? 'Guardando...' : 'Guardar Permisos'}
-        </Button>
+        <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleSelectAll}>Seleccionar Todos</Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleDeselectAll}>Anular Selección</Button>
+        </div>
+      </div>
+      <div className="space-y-4 rounded-lg border p-4">
+        {permissions.map((permission) => (
+          <PermissionNode 
+            key={permission.id} 
+            permission={permission} 
+            rolePermissions={rolePermissions}
+            onToggle={handleToggle}
+          />
+        ))}
       </div>
     </div>
   );
 }
-
-    

@@ -1,10 +1,8 @@
 
-
 'use client'
 
 import type { PropsWithChildren } from 'react';
-import React, { useState, useEffect, useCallback } from 'react';
-import { getRoles, getStaff, getServices, getBookings, getTenantConfig, getBudgets, type StaffMember, type Service, type Booking, type TenantConfig, type Budget } from '@/lib/firebase/firestore';
+import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +24,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
-  SidebarInset,
   SidebarTrigger,
   SidebarFooter,
 } from '@/components/ui/sidebar';
@@ -43,11 +40,17 @@ import {
   Sun,
   Moon,
   Laptop,
-  CreditCard
+  CreditCard,
+  Building,
+  Shield
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
+import { StudioProvider, useStudio } from '@/contexts/StudioContext';
+import { StudioDataProvider, useStudioData } from '@/contexts/StudioDataContext';
+import { cn } from '@/lib/utils';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Panel" },
@@ -57,216 +60,158 @@ const navItems = [
     { href: "/roles", icon: Fingerprint, label: "Roles" },
     { href: "/budgets", icon: Wand2, label: "Presupuestos" },
     { href: "/billing", icon: CreditCard, label: "Facturación" },
+    { href: "/studio", icon: Building, label: "Estudio" },
     { href: "/settings", icon: Settings, label: "Ajustes" },
 ]
 
-export type Permission = {
-  id: string;
-  label: string;
-  children?: Permission[];
-};
+const adminNavItems = [
+    { href: "/admin", icon: Shield, label: "Admin Panel" },
+]
 
-export type Role = {
-  id: string;
-  name: string;
-  permissions: Set<string>;
-};
+function AppLayoutContent({ children }: PropsWithChildren) {
+    const pathname = usePathname();
+    const { setTheme } = useTheme();
+    const { studio, loading: studioLoading } = useStudio();
+    const { loading: studioDataLoading, currentUser } = useStudioData();
+    
+    const hasCustomPadding = pathname.startsWith('/appointments');
 
-// Hierarchical permission structure
-export const allPermissions: Permission[] = [
-    {
-        id: "agenda",
-        label: "Agenda",
-        children: [
-            { id: "agenda_view", label: "Ver" },
-            { id: "agenda_manage", label: "Gestionar" },
-        ]
-    },
-    {
-        id: "management",
-        label: "Gestión",
-        children: [
-             { id: "services_manage", label: "Gestionar Servicios" },
-             { id: "staff_manage", label: "Gestionar Personal" },
-             { id: "budgets_manage", label: "Gestionar Presupuestos" },
-        ]
-    },
-    {
-        id: "config",
-        label: "Configuración",
-        children: [
-            { id: "roles_manage", label: "Gestionar Roles" },
-            { id: "settings_manage", label: "Gestionar Ajustes" },
-            { id: "billing_manage", label: "Gestionar Facturación" },
-        ]
-    },
-    { id: "reports_view", label: "Ver Reportes" },
-];
+    if (currentUser?.globalRole !== 'superAdmin' && (studioLoading || !studio) && pathname !== '/select-studio') {
+        return <div className="flex h-screen w-full items-center justify-center"><p>Cargando estudio...</p></div>;
+    }
 
+    const sidebarTitle = currentUser?.globalRole === 'superAdmin' ? 'Admin Panel' : (studio?.name || 'Glam&Beauty');
+
+    return (
+        <SidebarProvider collapsible="icon">
+            <div className="grid h-screen w-full lg:grid-cols-[280px_1fr]">
+                <Sidebar side="left" variant="sidebar" className="hidden lg:block">
+                    <SidebarHeader>
+                        <div className="flex items-center gap-2 p-2">
+                            <Sparkles className="w-8 h-8 text-sidebar-primary" />
+                            <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsed=true]:hidden">
+                                {sidebarTitle}
+                            </h1>
+                        </div>
+                    </SidebarHeader>
+                    <SidebarContent>
+                        <SidebarMenu>
+                            {currentUser?.globalRole !== 'superAdmin' && navItems.map((item) => (
+                                <SidebarMenuItem key={item.href}>
+                                    <SidebarMenuButton 
+                                        href={item.href}
+                                        label={item.label}
+                                        icon={item.icon}
+                                        isActive={pathname.startsWith(item.href)}
+                                    />
+                                </SidebarMenuItem>
+                            ))}
+                            {currentUser?.globalRole === 'superAdmin' && (
+                                <>
+                                    <DropdownMenuSeparator className="my-4" />
+                                    {adminNavItems.map((item) => (
+                                        <SidebarMenuItem key={item.href}>
+                                            <SidebarMenuButton 
+                                                href={item.href}
+                                                label={item.label}
+                                                icon={item.icon}
+                                                isActive={pathname.startsWith(item.href)}
+                                            />
+                                        </SidebarMenuItem>
+                                    ))}
+                                </>
+                            )}
+                        </SidebarMenu>
+                    </SidebarContent>
+                    <SidebarFooter>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                 <SidebarMenuButton 
+                                    href="/login"
+                                    label="Cerrar Sesión"
+                                    icon={LogOut}
+                                />
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarFooter>
+                </Sidebar>
+                 <div className="flex flex-col h-screen">
+                    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 lg:justify-end flex-shrink-0">
+                        <SidebarTrigger className="lg:hidden" />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="overflow-hidden rounded-full"
+                                >
+                                    <Avatar>
+                                        <AvatarImage src={currentUser?.photoURL || "https://placehold.co/32x32.png"} alt="User avatar" />
+                                        <AvatarFallback>
+                                            <CircleUser />
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>{currentUser?.displayName || 'Mi Cuenta'}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                    <Link href="/settings">
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        <span>Ajustes</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                        <Sun className="h-4 w-4 mr-2 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                                        <Moon className="absolute h-4 w-4 mr-2 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                                        <span>Tema</span>
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                        <DropdownMenuItem onClick={() => setTheme("light")}>
+                                            <Sun className="mr-2 h-4 w-4" />
+                                            <span>Claro</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setTheme("dark")}>
+                                            <Moon className="mr-2 h-4 w-4" />
+                                            <span>Oscuro</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setTheme("system")}>
+                                            <Laptop className="mr-2 h-4 w-4" />
+                                            <span>Sistema</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                    <Link href="/login">
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        <span>Cerrar Sesión</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </header>
+                    <main className="flex-1 overflow-hidden">
+                        <div className={cn("h-full", !hasCustomPadding && "overflow-y-auto p-4 md:p-6")}>
+                            {studioDataLoading && currentUser?.globalRole !== 'superAdmin' && pathname !== '/select-studio' ? <div className="flex h-full w-full items-center justify-center"><p>Cargando datos del estudio...</p></div> : children}
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </SidebarProvider>
+    );
+}
 
 export default function AppLayout({ children }: PropsWithChildren) {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [config, setConfig] = useState<TenantConfig | null>(null);
-  const [loading, setLoading] = useState(true);
-  const pathname = usePathname();
-  const { setTheme } = useTheme();
-
-  // Using a mock tenantId for now.
-  const tenantId = "test-tenant";
-
-  const refreshData = useCallback(async () => {
-    setLoading(true);
-    try {
-        const [fetchedRoles, fetchedStaff, fetchedServices, fetchedBookings, fetchedConfig, fetchedBudgets] = await Promise.all([
-        getRoles(tenantId),
-        getStaff(tenantId),
-        getServices(tenantId),
-        getBookings(tenantId),
-        getTenantConfig(tenantId),
-        getBudgets(tenantId),
-        ]);
-        setRoles(fetchedRoles);
-        setStaff(fetchedStaff);
-        setServices(fetchedServices);
-        setBookings(fetchedBookings);
-        setConfig(fetchedConfig);
-        setBudgets(fetchedBudgets);
-    } catch (error) {
-        console.error("Failed to fetch initial data:", error);
-        // Optionally, set an error state to show a message to the user
-    } finally {
-        setLoading(false);
-    }
-  }, [tenantId]);
-  
-  useEffect(() => {
-    refreshData();
-  }, [refreshData]);
-  
-  const childrenWithProps = React.Children.map(children, child => {
-    if (React.isValidElement(child)) {
-      // @ts-ignore - cloning child to pass props
-      return React.cloneElement(child, { 
-          roles, 
-          staff,
-          services,
-          bookings,
-          budgets,
-          config,
-          allPermissions, 
-          refreshData, 
-          loading,
-          tenantId 
-      });
-    }
-    return child;
-  });
-
-  const mainContentPadding = 'p-4 sm:px-6 sm:py-6';
-  
-  return (
-    <SidebarProvider>
-      <Sidebar side="left" variant="sidebar" collapsible="icon">
-        <SidebarHeader>
-            <div className="flex items-center gap-2 p-2">
-                <Sparkles className="w-8 h-8 text-sidebar-primary" />
-                <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsible=icon]:hidden">
-                    Glam&Beauty
-                </h1>
-            </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild tooltip={item.label} isActive={pathname.startsWith(item.href)}>
-                        <Link href={item.href}>
-                            <item.icon />
-                            <span>{item.label}</span>
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Cerrar Sesión">
-                    <Link href="/login">
-                        <LogOut />
-                        <span className="group-data-[collapsible=icon]:hidden">Cerrar Sesión</span>
-                    </Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6">
-          <SidebarTrigger className="md:hidden" />
-          <div/>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="overflow-hidden rounded-full"
-              >
-                <Avatar>
-                    <AvatarImage src="https://placehold.co/32x32.png" alt="User avatar" />
-                    <AvatarFallback>
-                        <CircleUser />
-                    </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/settings">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Ajustes</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                      <Sun className="h-4 w-4 mr-2 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                      <Moon className="absolute h-4 w-4 mr-2 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                      <span>Tema</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                      <DropdownMenuItem onClick={() => setTheme("light")}>
-                          <Sun className="mr-2 h-4 w-4" />
-                          <span>Claro</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTheme("dark")}>
-                          <Moon className="mr-2 h-4 w-4" />
-                          <span>Oscuro</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTheme("system")}>
-                          <Laptop className="mr-2 h-4 w-4" />
-                          <span>Sistema</span>
-                      </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSeparator />
-               <DropdownMenuItem asChild>
-                <Link href="/login">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Cerrar Sesión</span>
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </header>
-        <main className={`flex-1 ${mainContentPadding}`}>{loading ? <div className="flex h-full w-full items-center justify-center"><p>Cargando datos...</p></div> : childrenWithProps}</main>
-      </SidebarInset>
-    </SidebarProvider>
-  );
+    return (
+        <AuthProvider>
+            <StudioProvider>
+                <StudioDataProvider>
+                    <AppLayoutContent>{children}</AppLayoutContent>
+                </StudioDataProvider>
+            </StudioProvider>
+        </AuthProvider>
+    );
 }

@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Trivial change to force a restart
 };
 
 export default nextConfig;

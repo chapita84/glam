@@ -1,158 +1,131 @@
 
-'use client';
+'use client'
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { useStudioData } from "@/contexts/StudioDataContext"
+import { type StudioConfig, updateStudioConfig } from "@/lib/firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
-import { type TenantConfig, updateTenantConfig } from "@/lib/firebase/firestore"
 import { Loader2 } from "lucide-react"
 
-const daysOfWeek = [
-  { id: 1, label: "Lunes" },
-  { id: 2, label: "Martes" },
-  { id: 3, label: "Miércoles" },
-  { id: 4, label: "Jueves" },
-  { id: 5, label: "Viernes" },
-  { id: 6, label: "Sábado" },
-  { id: 0, label: "Domingo" },
-];
+const dayNames: { [key: number]: string } = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
 
-interface SettingsPageProps {
-  config: TenantConfig | null;
-  tenantId: string;
-  refreshData: () => void;
-  loading: boolean;
-}
-
-export default function SettingsPage({ config: initialConfig, tenantId, refreshData, loading: initialLoading }: SettingsPageProps) {
-  const [config, setConfig] = useState<TenantConfig | null>(initialConfig);
+export default function SettingsPage() {
+  const { studioId, config: initialConfig, refreshData, loading: dataLoading } = useStudioData();
+  const [config, setConfig] = useState<StudioConfig | null>(initialConfig);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Sync local state when the initialConfig prop changes after loading
-    if (!initialLoading && initialConfig) {
+    if (initialConfig) {
       setConfig(initialConfig);
+    } else {
+        // Initialize with default values if no config is present
+        setConfig({
+            workingHours: Array.from({ length: 7 }, (_, i) => ({
+                dayOfWeek: i,
+                startTime: '09:00',
+                endTime: '18:00',
+                enabled: i > 0 && i < 6, // Mon-Fri enabled by default
+            }))
+        })
     }
-  }, [initialConfig, initialLoading]);
+  }, [initialConfig]);
 
-  const handleWorkingHoursChange = (dayId: number, field: 'startTime' | 'endTime' | 'enabled', value: string | boolean) => {
-    setConfig(prevConfig => {
-      if (!prevConfig) return null;
-      
-      const newWorkingHours = prevConfig.workingHours ? [...prevConfig.workingHours] : [];
-      let dayFound = false;
-
-      // Find and update the day
-      const updatedHours = newWorkingHours.map(d => {
-        if (d.dayOfWeek === dayId) {
-          dayFound = true;
-          return { ...d, [field]: value };
-        }
-        return d;
-      });
-
-      // If the day was not found, add it
-      if (!dayFound) {
-        const defaultDay = { dayOfWeek: dayId, startTime: "09:00", endTime: "18:00", enabled: false };
-        updatedHours.push({ ...defaultDay, [field]: value });
-      }
-      
-      // We sort here to ensure the UI is always consistent
-      updatedHours.sort((a,b) => {
-        const dayA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
-        const dayB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
-        return dayA - dayB;
-      });
-
-
-      return { ...prevConfig, workingHours: updatedHours };
-    });
-  };
-
-  const handleSave = async () => {
-      if (!config || !tenantId) {
-          toast({ title: "Error", description: "No se pudo guardar la configuración.", variant: "destructive" });
-          return;
-      }
-      setIsSaving(true);
-      try {
-          await updateTenantConfig(tenantId, config);
-          toast({ title: "Éxito", description: "La configuración se ha guardado correctamente." });
-          await refreshData();
-      } catch (error) {
-           toast({ title: "Error", description: "Hubo un problema al guardar la configuración.", variant: "destructive" });
-           console.error(error);
-      } finally {
-          setIsSaving(false);
-      }
-  };
-
-  if (initialLoading || !config) {
-    return <div className="flex h-full w-full items-center justify-center"><p>Cargando configuración...</p></div>;
+  const handleTimeChange = (day: number, field: 'startTime' | 'endTime', value: string) => {
+    if (config) {
+        const newWorkingHours = config.workingHours.map(wh => 
+            wh.dayOfWeek === day ? { ...wh, [field]: value } : wh
+        );
+        setConfig({ ...config, workingHours: newWorkingHours });
+    }
   }
 
+  const handleEnableToggle = (day: number, enabled: boolean) => {
+    if (config) {
+        const newWorkingHours = config.workingHours.map(wh => 
+            wh.dayOfWeek === day ? { ...wh, enabled } : wh
+        );
+        setConfig({ ...config, workingHours: newWorkingHours });
+    }
+  }
+
+  const handleSave = async () => {
+    if (!studioId || !config) return;
+    setIsSaving(true);
+    try {
+        await updateStudioConfig(studioId, config);
+        await refreshData();
+        toast({ title: "Configuración Guardada", description: "Tus ajustes se han actualizado." });
+    } catch (error) {
+        toast({ title: "Error", description: "No se pudo guardar la configuración.", variant: "destructive" });
+    } finally {
+        setIsSaving(false);
+    }
+  }
+
+  if (dataLoading) {
+      return <div>Cargando configuración...</div>;
+  }
+  
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Ajustes</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Ajustes</h1>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Horario de Trabajo</CardTitle>
+          <CardDescription>Define los días y horas en que tu estudio está abierto para recibir citas.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {config?.workingHours.sort((a,b) => a.dayOfWeek - b.dayOfWeek).map(wh => (
+            <div key={wh.dayOfWeek} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4">
+              <div className="w-full md:w-1/4 font-semibold">{dayNames[wh.dayOfWeek]}</div>
+              <div className="flex-grow flex items-center gap-4">
+                 <div className="flex-1">
+                    <Label htmlFor={`start-time-${wh.dayOfWeek}`}>Desde</Label>
+                    <Input 
+                        id={`start-time-${wh.dayOfWeek}`}
+                        type="time" 
+                        value={wh.startTime} 
+                        onChange={e => handleTimeChange(wh.dayOfWeek, 'startTime', e.target.value)}
+                        disabled={!wh.enabled}
+                    />
+                 </div>
+                 <div className="flex-1">
+                    <Label htmlFor={`end-time-${wh.dayOfWeek}`}>Hasta</Label>
+                    <Input 
+                        id={`end-time-${wh.dayOfWeek}`}
+                        type="time" 
+                        value={wh.endTime} 
+                        onChange={e => handleTimeChange(wh.dayOfWeek, 'endTime', e.target.value)}
+                        disabled={!wh.enabled}
+                    />
+                 </div>
+              </div>
+              <div className="flex items-center gap-2">
+                 <Label htmlFor={`enabled-${wh.dayOfWeek}`} className="text-sm">Abierto</Label>
+                 <Switch 
+                    id={`enabled-${wh.dayOfWeek}`}
+                    checked={wh.enabled} 
+                    onCheckedChange={checked => handleEnableToggle(wh.dayOfWeek, checked)}
+                />
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      
+      <div className="flex justify-end">
         <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
             Guardar Cambios
         </Button>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Horarios Laborables</CardTitle>
-          <CardDescription>
-            Define los días y horas en que tu estudio está abierto para recibir citas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {daysOfWeek.map(({ id, label }) => {
-            const dayConfig = config.workingHours?.find(d => d.dayOfWeek === id) || { enabled: false, startTime: "09:00", endTime: "18:00" };
-            return (
-              <div key={id} className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
-                   <Switch
-                      id={`enabled-${id}`}
-                      checked={dayConfig.enabled}
-                      onCheckedChange={(checked) => handleWorkingHoursChange(id, 'enabled', checked)}
-                    />
-                  <Label htmlFor={`enabled-${id}`} className="w-24 text-lg font-medium">{label}</Label>
-                </div>
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="flex-1">
-                    <Label htmlFor={`start-${id}`}>Apertura</Label>
-                    <Input
-                      id={`start-${id}`}
-                      type="time"
-                      value={dayConfig.startTime}
-                      onChange={(e) => handleWorkingHoursChange(id, 'startTime', e.target.value)}
-                      disabled={!dayConfig.enabled}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor={`end-${id}`}>Cierre</Label>
-                    <Input
-                      id={`end-${id}`}
-                      type="time"
-                      value={dayConfig.endTime}
-                      onChange={(e) => handleWorkingHoursChange(id, 'endTime', e.target.value)}
-                      disabled={!dayConfig.enabled}
-                    />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </CardContent>
-      </Card>
     </div>
-  );
+  )
 }
