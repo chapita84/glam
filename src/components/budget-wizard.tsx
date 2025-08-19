@@ -1,10 +1,9 @@
 
 "use client"
 
-import { useActionState, useState, useEffect } from "react"
+import { useActionState, useState, useEffect, useMemo } from "react"
 import { useFormStatus } from "react-dom"
-import { useStudioData } from "@/contexts/StudioDataContext"
-import { handleAIGeneration, handleSaveBudget, type BudgetItem } from "@/app/(app)/budgets/actions"
+import { handleAIGeneration, handleSaveBudget } from "@/app/(app)/budgets/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,12 +11,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Terminal, Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2, Save, Send, CheckCircle, XCircle, Library, CirclePlus } from "lucide-react"
+import { Wand2, PartyPopper, Truck, FileText, Loader2, PlusCircle, Trash2, Save, Send, CheckCircle, XCircle, Library, CirclePlus } from "lucide-react"
 import { BudgetDownloadButton } from "./budget-download-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
-import { type Budget, type Service as ServiceTemplate } from "@/lib/firebase/firestore"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
+import { type Budget, type Service, type BudgetItem } from "@/lib/types"
+import { getServicesForStudio } from "@/lib/firebase/firestore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog"
 import { ScrollArea } from "./ui/scroll-area"
+import { useToast } from "@/hooks/use-toast"
 
 const steps = [
   { id: 1, name: "Detalles del Evento", icon: PartyPopper },
@@ -26,7 +27,7 @@ const steps = [
   { id: 4, name: "Resumen y Acciones", icon: FileText },
 ]
 
-const statusOptions = [
+const statusOptions: { value: Budget['status'], label: string, icon: React.ElementType }[] = [
     { value: 'draft', label: 'Borrador', icon: Wand2 },
     { value: 'sent', label: 'Enviado', icon: Send },
     { value: 'approved', label: 'Confirmado', icon: CheckCircle },
@@ -34,13 +35,14 @@ const statusOptions = [
 ]
 
 interface BudgetWizardProps {
+    studioId: string;
     initialBudget: Budget | null;
     onSave: () => void;
 }
 
-export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
-  const { studioId, services: serviceTemplates } = useStudioData();
-  const [currentStep, setCurrentStep] = useState(0)
+export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardProps) {
+  const [serviceTemplates, setServiceTemplates] = useState<Service[]>([]);
+  const [currentStep, setCurrentStep] = useState(0);
   const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
   
   const [eventDetails, setEventDetails] = useState({
@@ -49,29 +51,60 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
       eventDate: initialBudget?.eventInfo?.date ? new Date(initialBudget.eventInfo.date).toISOString().split('T')[0] : "",
       eventTime: initialBudget?.eventInfo?.time || "12:00",
       eventLocation: initialBudget?.eventInfo?.location || "",
-  })
+  });
   const [items, setItems] = useState<BudgetItem[]>(initialBudget?.items || []);
   const [logisticsCost, setLogisticsCost] = useState(initialBudget?.summary?.logistics || 50);
-  const [usdRate, setUsdRate] = useState(initialBudget?.summary?.exchangeRate || 900);
-  const [status, setStatus] = useState<'draft' | 'sent' | 'approved' | 'rejected'>(initialBudget?.status || 'draft');
+  const [usdRate, setUsdRate] = useState(initialBudget?.summary?.exchangeRate || 1000);
+  const [status, setStatus] = useState<Budget['status']> (initialBudget?.status || 'draft');
 
+  const { toast } = useToast();
   const [aiState, aiFormAction] = useActionState(handleAIGeneration, { message: "" });
   
-  const saveBudgetWithStudioId = handleSaveBudget.bind(null, studioId!);
+  const saveBudgetWithStudioId = handleSaveBudget.bind(null, studioId);
   const [budgetState, budgetFormAction] = useActionState(saveBudgetWithStudioId, { message: "" });
+
+  useEffect(() => {
+    async function loadServices() {
+        if (studioId) {
+            const services = await getServicesForStudio(studioId);
+            setServiceTemplates(services);
+        }
+    }
+    loadServices();
+  }, [studioId]);
 
 
   useEffect(() => {
     if (aiState.message === 'success' && aiState.data) {
         setItems(aiState.data);
+        toast({ title: "Sugerencias generadas", description: "Se han añadido servicios sugeridos por la IA." });
+    } else if (aiState.message && aiState.message !== 'success') {
+        toast({ title: "Error de IA", description: aiState.message, variant: 'destructive' });
     }
-  }, [aiState]);
+  }, [aiState, toast]);
 
   useEffect(() => {
     if (budgetState.message === 'success') {
+        toast({ title: "¡Éxito!", description: "El presupuesto se ha guardado correctamente." });
         onSave();
+    } else if (budgetState.message && budgetState.message !== 'success') {
+        toast({ title: "Error al guardar", description: budgetState.message, variant: 'destructive' });
     }
-  }, [budgetState, onSave]);
+  }, [budgetState, onSave, toast]);
+
+  const { servicesSubtotal, totalUSD, totalARS, budgetPDFData, pdfFileName } = useMemo(() => {
+    const servicesSubtotal = items.reduce((total, item) => total + ((item.quantity || 0) * (item.unitCost.amount || 0)), 0);
+    const totalUSD = servicesSubtotal + (logisticsCost || 0);
+    const totalARS = totalUSD * (usdRate || 0);
+    const budgetPDFData = {
+      eventType: eventDetails.eventType, eventDate: eventDetails.eventDate, eventLocation: eventDetails.eventLocation,
+      services: items.map(i => ({ name: i.description, quantity: i.quantity, price: i.unitCost.amount })),
+      servicesTotal: servicesSubtotal, logisticsCost, totalUSD, totalARS, usdRate,
+    }
+    const pdfFileName = `Presupuesto-${eventDetails.eventType}-${eventDetails.clientName}.pdf`;
+    return { servicesSubtotal, totalUSD, totalARS, budgetPDFData, pdfFileName };
+  }, [items, logisticsCost, usdRate, eventDetails]);
+  
 
   const progress = ((currentStep + 1) / steps.length) * 100
 
@@ -82,23 +115,26 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
       setEventDetails({...eventDetails, [e.target.id]: e.target.value });
   }
 
-  const handleItemChange = (index: number, field: keyof BudgetItem, value: string | number) => {
+  const handleItemChange = (index: number, field: keyof BudgetItem, value: any) => {
       const newItems = [...items];
+      const item = { ...newItems[index] };
+
       if (field === 'unitCost') {
-          newItems[index].unitCost.amount = Number(value);
+          item.unitCost = { ...item.unitCost, amount: parseFloat(value) || 0 };
       } else {
-        const parsedValue = typeof value === 'string' && (field === 'quantity' || field === 'duration') ? parseFloat(value) : value;
-        (newItems[index] as any)[field] = parsedValue;
+          (item as any)[field] = (field === 'quantity' || field === 'duration') ? parseInt(value, 10) || 0 : value;
       }
+      
+      newItems[index] = item;
       setItems(newItems);
   };
-
+  
   const addItem = (item: BudgetItem) => setItems([...items, item]);
   
-  const addServiceFromTemplate = (template: ServiceTemplate) => {
+  const addServiceFromTemplate = (template: Service) => {
     addItem({
         description: template.name,
-        category: template.category,
+        category: template.categoryId || 'General',
         quantity: 1,
         unitCost: { amount: template.price, currency: 'USD' },
         duration: template.duration
@@ -108,18 +144,6 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
 
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
   
-  const servicesSubtotal = items.reduce((total, item) => total + ((item.quantity || 0) * (item.unitCost.amount || 0)), 0);
-  const totalUSD = servicesSubtotal + (logisticsCost || 0);
-  const totalARS = totalUSD * (usdRate || 0);
-
-  const budgetPDFData = {
-    eventType: eventDetails.eventType, eventDate: eventDetails.eventDate, eventLocation: eventDetails.eventLocation,
-    services: items.map(i => ({ name: i.description, quantity: i.quantity, price: i.unitCost.amount })),
-    servicesTotal: servicesSubtotal, logisticsCost, totalUSD, totalARS, usdRate,
-  }
-
-  const pdfFileName = `Presupuesto-${eventDetails.eventType}-${eventDetails.clientName}.pdf`;
-
   const AIGenerateButton = () => {
     const { pending } = useFormStatus();
     return <Button type="submit" disabled={pending}>{pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Generar Sugerencias</Button>
@@ -129,7 +153,7 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
     const { pending } = useFormStatus();
     return <Button type="submit" className="w-full" disabled={pending || !studioId}>{pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {children}</Button>
   }
-
+  
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
       <Progress value={progress} className="mb-8" />
@@ -138,8 +162,8 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
         <p className="text-muted-foreground">Paso {currentStep + 1} de {steps.length}</p>
       </div>
 
-      <div className="space-y-6">
-        {currentStep === 0 && ( /* Step 1: Event Details */
+      <div className="space-y-6 min-h-[400px]">
+        {currentStep === 0 && (
             <div className="space-y-4">
                 <Input id="clientName" placeholder="Nombre del Cliente" value={eventDetails.clientName} onChange={handleEventDetailsChange} />
                 <Input id="eventType" placeholder="Tipo de Evento" value={eventDetails.eventType} onChange={handleEventDetailsChange} />
@@ -149,7 +173,7 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
             </div>
         )}
 
-        {currentStep === 1 && ( /* Step 2: Services */
+        {currentStep === 1 && (
           <div className="space-y-6">
              <form action={aiFormAction} className="space-y-4 p-4 border rounded-lg">
                 <Textarea id="eventTypeDescription" name="eventTypeDescription" placeholder="Describa el evento para recibir sugerencias de la IA..." />
@@ -162,7 +186,7 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
                         <TableRow key={index}>
                             <TableCell><Input value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} /></TableCell>
                             <TableCell><Input type="number" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} className="w-16"/></TableCell>
-                            <TableCell><Input type="number" value={item.duration} onChange={e => handleItemChange(index, 'duration', e.target.value)} className="w-20"/></TableCell>
+                            <TableCell><Input type="number" value={item.duration || ''} onChange={e => handleItemChange(index, 'duration', e.target.value)} className="w-20"/></TableCell>
                             <TableCell><Input type="number" step="0.01" value={item.unitCost.amount} onChange={e => handleItemChange(index, 'unitCost', e.target.value)} className="w-24"/></TableCell>
                             <TableCell>${((item.quantity || 0) * (item.unitCost.amount || 0)).toFixed(2)}</TableCell>
                             <TableCell><Button variant="ghost" size="icon" onClick={() => removeItem(index)}><Trash2 className="h-4 w-4" /></Button></TableCell>
@@ -184,12 +208,12 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
           </div>
         )}
 
-        {currentStep === 2 && ( /* Step 3: Costs and Status */
+        {currentStep === 2 && (
           <div className="space-y-6">
             <div><Label htmlFor="logisticsCost">Costo de Logística (USD)</Label><Input id="logisticsCost" type="number" value={logisticsCost} onChange={e => setLogisticsCost(parseFloat(e.target.value) || 0)}/></div>
             <div><Label htmlFor="usdRate">Tasa de Cambio (USD a ARS)</Label><Input id="usdRate" type="number" value={usdRate} onChange={e => setUsdRate(parseFloat(e.target.value) || 0)}/></div>
             <div><Label>Estado del Presupuesto</Label>
-                 <Select value={status} onValueChange={(v: any) => setStatus(v)}>
+                 <Select value={status} onValueChange={(v: Budget['status']) => setStatus(v)}>
                     <SelectTrigger><SelectValue placeholder="Selecciona un estado" /></SelectTrigger>
                     <SelectContent>{statusOptions.map(option => (<SelectItem key={option.value} value={option.value}><div className="flex items-center gap-2"><option.icon className="h-4 w-4" /><span>{option.label}</span></div></SelectItem>))}</SelectContent>
                 </Select>
@@ -197,7 +221,7 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
           </div>
         )}
 
-        {currentStep === 3 && ( /* Step 4: Summary and Actions */
+        {currentStep === 3 && (
             <div className="space-y-6">
                 <div className="p-6 border rounded-lg space-y-2">
                     <div className="flex justify-between"><span className="text-muted-foreground">Cliente:</span><span className="font-medium">{eventDetails.clientName}</span></div>
@@ -207,7 +231,6 @@ export function BudgetWizard({ initialBudget, onSave }: BudgetWizardProps) {
                 <div className="grid md:grid-cols-2 gap-4">
                     <BudgetDownloadButton data={budgetPDFData} fileName={pdfFileName} />
                     <form action={budgetFormAction}>
-                        {/* Hidden inputs to pass all data to the server action */}
                         <input type="hidden" name="id" value={initialBudget?.id || ''} />
                         <input type="hidden" name="budgetName" value={`${eventDetails.eventType} - ${eventDetails.clientName}`} />
                         <input type="hidden" name="clientName" value={eventDetails.clientName} />

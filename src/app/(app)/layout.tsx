@@ -1,217 +1,134 @@
 
-'use client'
+'use client';
 
-import type { PropsWithChildren } from 'react';
-import React from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarTrigger,
-  SidebarFooter,
-} from '@/components/ui/sidebar';
-import {
-  LayoutDashboard,
-  Calendar,
-  Sparkles,
-  Users,
-  Fingerprint,
-  Wand2,
-  LogOut,
-  CircleUser,
-  Settings,
-  Sun,
-  Moon,
-  Laptop,
-  CreditCard,
-  Building,
-  Shield
+    CircleUser, Calendar, Settings, Users, Briefcase, LayoutDashboard, LogOut, UserCog, ShieldCheck, FileText, CreditCard, Search, Landmark
 } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useTheme } from 'next-themes';
-import { StudioProvider, useStudio } from '@/contexts/StudioContext';
-import { StudioDataProvider, useStudioData } from '@/contexts/StudioDataContext';
-import { cn } from '@/lib/utils';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter, SidebarProvider } from '@/components/ui/sidebar';
+import { Toaster } from '@/components/ui/toaster';
+import { ReactNode, useMemo } from 'react';
+import { Loader2 } from 'lucide-react';
+import { getAllPermissionIds, ALL_PERMISSIONS } from '@/lib/permissions';
 
-const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Panel" },
-    { href: "/appointments", icon: Calendar, label: "Citas" },
-    { href: "/services", icon: Sparkles, label: "Servicios" },
-    { href: "/staff", icon: Users, label: "Personal" },
-    { href: "/roles", icon: Fingerprint, label: "Roles" },
-    { href: "/budgets", icon: Wand2, label: "Presupuestos" },
-    { href: "/billing", icon: CreditCard, label: "Facturación" },
-    { href: "/studio", icon: Building, label: "Estudio" },
-    { href: "/settings", icon: Settings, label: "Ajustes" },
-]
+const allNavItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:view' },
+    { href: '/appointments', label: 'Turnos', icon: Calendar, permission: 'appointments:view' },
+    { href: '/services', label: 'Servicios', icon: Briefcase, permission: 'services:view' },
+    { href: '/staff', label: 'Staff', icon: Users, permission: 'staff:view' },
+    { href: '/budgets', label: 'Presupuestos', icon: FileText, permission: 'budgets:view' },
+    { href: '/billing', label: 'Facturación', icon: CreditCard, permission: 'settings:manage-billing' },
+    { href: '/roles', label: 'Roles de Estudio', icon: ShieldCheck, permission: 'settings:manage-roles' },
+    { href: '/settings', label: 'Configuración', icon: Settings, permission: 'settings:manage-studio' },
+    { href: '/admin/users', label: 'Usuarios', icon: UserCog, permission: 'admin:manage-users' },
+    { href: '/admin/roles', label: 'Roles Globales', icon: ShieldCheck, permission: 'admin:manage-roles' },
+];
 
-const adminNavItems = [
-    { href: "/admin", icon: Shield, label: "Admin Panel" },
-]
-
-function AppLayoutContent({ children }: PropsWithChildren) {
+export default function AppLayout({ children }: { children: ReactNode }) {
+    console.log("DEBUG: Renderizando AppLayout");
     const pathname = usePathname();
-    const { setTheme } = useTheme();
-    const { studio, loading: studioLoading } = useStudio();
-    const { loading: studioDataLoading, currentUser } = useStudioData();
-    
-    const hasCustomPadding = pathname.startsWith('/appointments');
+    const { 
+        currentUser, 
+        profile,
+        currentStudio,
+        currentStudioRole,
+        logout, 
+        loading: authLoading 
+    } = useAuth();
+    const router = useRouter();
 
-    if (currentUser?.globalRole !== 'superAdmin' && (studioLoading || !studio) && pathname !== '/select-studio') {
-        return <div className="flex h-screen w-full items-center justify-center"><p>Cargando estudio...</p></div>;
+    const accessibleNavItems = useMemo(() => {
+        console.log("DEBUG: [useMemo accessibleNavItems] Recalculando menú...");
+        if (!profile) {
+            console.log("DEBUG: [useMemo accessibleNavItems] No hay perfil, menú vacío.");
+            return [];
+        }
+
+        if (profile.globalRole === 'superAdmin') {
+            console.log("DEBUG: [useMemo accessibleNavItems] Es Super Admin, mostrando items de admin.");
+            const allPermissions = new Set(getAllPermissionIds(ALL_PERMISSIONS));
+            allPermissions.add('admin:manage-users');
+            allPermissions.add('admin:manage-roles');
+            return allNavItems.filter(item => allPermissions.has(item.permission));
+        }
+
+        if (currentStudioRole?.permissions) {
+             const userPermissions = new Set(currentStudioRole.permissions);
+             console.log("DEBUG: [useMemo accessibleNavItems] Permisos del rol de estudio:", userPermissions);
+             const items = allNavItems.filter(item => userPermissions.has(item.permission));
+             console.log("DEBUG: [useMemo accessibleNavItems] Items de menú accesibles:", items);
+             return items;
+        }
+        
+        console.log("DEBUG: [useMemo accessibleNavItems] No se cumplió ninguna condición, menú vacío.");
+        return [];
+    }, [profile, currentStudioRole]);
+
+    if (authLoading) {
+        return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>;
     }
-
-    const sidebarTitle = currentUser?.globalRole === 'superAdmin' ? 'Admin Panel' : (studio?.name || 'Glam&Beauty');
+    
+    if (!currentUser) return null;
 
     return (
-        <SidebarProvider collapsible="icon">
+        <SidebarProvider collapsible="full"> 
             <div className="grid h-screen w-full lg:grid-cols-[280px_1fr]">
-                <Sidebar side="left" variant="sidebar" className="hidden lg:block">
+                <Sidebar>
                     <SidebarHeader>
-                        <div className="flex items-center gap-2 p-2">
-                            <Sparkles className="w-8 h-8 text-sidebar-primary" />
-                            <h1 className="text-xl font-semibold text-sidebar-primary tracking-wider group-data-[collapsed=true]:hidden">
-                                {sidebarTitle}
-                            </h1>
-                        </div>
+                        <h1 className="text-2xl font-bold">GlamDash</h1>
+                        {currentStudio ? <p className="text-sm text-muted-foreground">{currentStudio.name}</p> : <p className="text-sm text-muted-foreground">Menú Principal</p>}
                     </SidebarHeader>
                     <SidebarContent>
                         <SidebarMenu>
-                            {currentUser?.globalRole !== 'superAdmin' && navItems.map((item) => (
+                            {accessibleNavItems.map((item) => (
                                 <SidebarMenuItem key={item.href}>
                                     <SidebarMenuButton 
-                                        href={item.href}
-                                        label={item.label}
-                                        icon={item.icon}
-                                        isActive={pathname.startsWith(item.href)}
+                                        href={item.href} 
+                                        label={item.label} 
+                                        icon={item.icon} 
+                                        isActive={pathname.startsWith(item.href)} 
                                     />
                                 </SidebarMenuItem>
                             ))}
-                            {currentUser?.globalRole === 'superAdmin' && (
-                                <>
-                                    <DropdownMenuSeparator className="my-4" />
-                                    {adminNavItems.map((item) => (
-                                        <SidebarMenuItem key={item.href}>
-                                            <SidebarMenuButton 
-                                                href={item.href}
-                                                label={item.label}
-                                                icon={item.icon}
-                                                isActive={pathname.startsWith(item.href)}
-                                            />
-                                        </SidebarMenuItem>
-                                    ))}
-                                </>
-                            )}
                         </SidebarMenu>
                     </SidebarContent>
                     <SidebarFooter>
-                        <SidebarMenu>
-                            <SidebarMenuItem>
-                                 <SidebarMenuButton 
-                                    href="/login"
-                                    label="Cerrar Sesión"
-                                    icon={LogOut}
-                                />
-                            </SidebarMenuItem>
-                        </SidebarMenu>
-                    </SidebarFooter>
-                </Sidebar>
-                 <div className="flex flex-col h-screen">
-                    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:px-6 lg:justify-end flex-shrink-0">
-                        <SidebarTrigger className="lg:hidden" />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="overflow-hidden rounded-full"
-                                >
-                                    <Avatar>
-                                        <AvatarImage src={currentUser?.photoURL || "https://placehold.co/32x32.png"} alt="User avatar" />
-                                        <AvatarFallback>
-                                            <CircleUser />
-                                        </AvatarFallback>
-                                    </Avatar>
+                                <Button variant="ghost" className="w-full justify-start gap-3">
+                                    <CircleUser className="h-6 w-6" />
+                                    <span>{profile?.displayName || currentUser.email}</span>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>{currentUser?.displayName || 'Mi Cuenta'}</DropdownMenuLabel>
+                            <DropdownMenuContent className="w-56" align="end" forceMount>
+                                <DropdownMenuLabel>
+                                    <div className="flex flex-col space-y-1">
+                                        <p className="text-sm font-medium leading-none">{profile?.displayName}</p>
+                                        <p className="text-xs leading-none text-muted-foreground">{currentUser.email}</p>
+                                    </div>
+                                </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                    <Link href="/settings">
-                                        <Settings className="mr-2 h-4 w-4" />
-                                        <span>Ajustes</span>
-                                    </Link>
+                                <DropdownMenuItem onClick={() => router.push('/select-studio')}>
+                                    <Landmark className="mr-2 h-4 w-4" />
+                                    <span>Cambiar Estudio</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger>
-                                        <Sun className="h-4 w-4 mr-2 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                                        <Moon className="absolute h-4 w-4 mr-2 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                                        <span>Tema</span>
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuSubContent>
-                                        <DropdownMenuItem onClick={() => setTheme("light")}>
-                                            <Sun className="mr-2 h-4 w-4" />
-                                            <span>Claro</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setTheme("dark")}>
-                                            <Moon className="mr-2 h-4 w-4" />
-                                            <span>Oscuro</span>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setTheme("system")}>
-                                            <Laptop className="mr-2 h-4 w-4" />
-                                            <span>Sistema</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuSub>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                    <Link href="/login">
-                                        <LogOut className="mr-2 h-4 w-4" />
-                                        <span>Cerrar Sesión</span>
-                                    </Link>
+                                <DropdownMenuItem onClick={logout} className="text-destructive">
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Cerrar Sesión</span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                    </header>
-                    <main className="flex-1 overflow-hidden">
-                        <div className={cn("h-full", !hasCustomPadding && "overflow-y-auto p-4 md:p-6")}>
-                            {studioDataLoading && currentUser?.globalRole !== 'superAdmin' && pathname !== '/select-studio' ? <div className="flex h-full w-full items-center justify-center"><p>Cargando datos del estudio...</p></div> : children}
-                        </div>
-                    </main>
-                </div>
+                    </SidebarFooter>
+                </Sidebar>
+                <main className="flex flex-col h-full overflow-y-auto p-6 bg-muted/20">
+                    {children}
+                </main>
+                <Toaster />
             </div>
         </SidebarProvider>
-    );
-}
-
-export default function AppLayout({ children }: PropsWithChildren) {
-    return (
-        <AuthProvider>
-            <StudioProvider>
-                <StudioDataProvider>
-                    <AppLayoutContent>{children}</AppLayoutContent>
-                </StudioDataProvider>
-            </StudioProvider>
-        </AuthProvider>
     );
 }

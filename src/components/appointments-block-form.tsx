@@ -9,7 +9,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
-import { type TimeBlock } from "@/lib/firebase/firestore";
+import { type TimeBlock } from "@/lib/types"; // Corrected import path
 import { format, parse, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -36,10 +36,10 @@ export function BlockForm({ isOpen, onClose, onSave, onDelete, block, isSaving, 
         if (block) {
             setReason(block.reason || '');
             setIsAllDay(block.isAllDay || false);
-            setStartDate(format(block.startTime || new Date(), 'yyyy-MM-dd'));
-            setStartTime(format(block.startTime || new Date(), 'HH:mm'));
-            setEndDate(format(block.endTime || new Date(), 'yyyy-MM-dd'));
-            setEndTime(format(block.endTime || new Date(), 'HH:mm'));
+            setStartDate(format(block.start || new Date(), 'yyyy-MM-dd'));
+            setStartTime(format(block.start || new Date(), 'HH:mm'));
+            setEndDate(format(block.end || new Date(), 'yyyy-MM-dd'));
+            setEndTime(format(block.end || new Date(), 'HH:mm'));
         } else {
             setReason('');
             setIsAllDay(false);
@@ -57,18 +57,13 @@ export function BlockForm({ isOpen, onClose, onSave, onDelete, block, isSaving, 
             return;
         }
 
-        let finalStartTime = parse(`${startDate} ${startTime}`, 'yyyy-MM-dd HH:mm', new Date());
-        let finalEndTime = parse(`${endDate} ${endTime}`, 'yyyy-MM-dd HH:mm', new Date());
+        const finalStartTime = parse(`${startDate} ${startTime}`, 'yyyy-MM-dd HH:mm', new Date());
+        const finalEndTime = parse(`${endDate} ${endTime}`, 'yyyy-MM-dd HH:mm', new Date());
 
-        if (isAllDay) {
-            finalStartTime = startOfDay(parse(startDate, 'yyyy-MM-dd', new Date()));
-            finalEndTime = endOfDay(parse(endDate, 'yyyy-MM-dd', new Date()));
-        }
-
-        const blockData: Omit<TimeBlock, 'id' | 'createdAt'> & { id?: string } = {
+        const blockData = {
             id: block?.id,
-            startTime: finalStartTime,
-            endTime: finalEndTime,
+            start: isAllDay ? startOfDay(finalStartTime) : finalStartTime,
+            end: isAllDay ? endOfDay(finalEndTime) : finalEndTime,
             isAllDay,
             reason
         };
@@ -111,7 +106,7 @@ export function BlockForm({ isOpen, onClose, onSave, onDelete, block, isSaving, 
                 </div>
                 <DialogFooter className="flex justify-between w-full">
                     <div>
-                        {block?.id && (
+                        {block?.id && canDelete && (
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                     <Button variant="destructive" disabled={isSaving}><Trash2 className="mr-2 h-4 w-4"/>Eliminar</Button>

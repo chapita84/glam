@@ -1,25 +1,21 @@
 
-'use client'
+'use client';
 
-import React, { useState } from "react"
-import type { Role } from "../layout"
-import { addOrUpdateStaffMember, deleteStaffMember, type StaffMember } from "@/lib/firebase/firestore";
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import React, { useState, useEffect } from 'react';
+import {
+  getStaffForStudio,
+  // deleteStaffMember has been removed as it requires a backend implementation
+} from '@/lib/firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -27,7 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -35,116 +31,160 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MoreHorizontal, PlusCircle, Loader2 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useStudioData } from "@/contexts/StudioDataContext";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PlusCircle, Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { app, db } from '@/lib/firebase/config';
+import { type UserProfile, type StudioRole } from '@/lib/types';
+import { collection, getDocs } from 'firebase/firestore';
+
+const functions = getFunctions(app, 'us-central1');
+const createStaffUserFn = httpsCallable(functions, 'createStaffUser');
+
+type StaffMemberWithRole = UserProfile & { roleId: string };
 
 export default function StaffPageClient() {
-  const { roles, staff, studioId, refreshData, loading } = useStudioData();
-  const [open, setOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
+  const { currentStudio, profile, currentUser } = useAuth();
+  const [staff, setStaff] = useState<StaffMemberWithRole[]>([]);
+  const [studioRoles, setStudioRoles] = useState<StudioRole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  const handleOpenDialog = (member: StaffMember | null) => {
-    setEditingMember(member);
-    setOpen(true);
+  const refreshData = async () => {
+    if (!currentStudio) return;
+    setLoading(true);
+    try {
+      const [fetchedStaff, rolesSnapshot] = await Promise.all([
+        getStaffForStudio(currentStudio.id),
+        getDocs(collection(db, 'studios', currentStudio.id, 'roles')),
+      ]);
+      setStaff(fetchedStaff);
+      setStudioRoles(
+        rolesSnapshot.docs.map((doc) => doc.data() as StudioRole)
+      );
+    } catch (error) {
+      console.error('Error fetching staff data:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los datos del personal.',
+        variant: 'destructive',
+      });
+    }
+    setLoading(false);
   };
-  
-  const handleSaveMember = async (event: React.FormEvent<HTMLFormElement>) => {
+
+  useEffect(() => {
+    if (currentStudio) {
+      refreshData();
+    } else {
+      setLoading(false);
+    }
+  }, [currentStudio]);
+
+  const handleCreateStaff = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
-    if (!studioId) {
-      toast({ title: "Error", description: "No se ha podido identificar el estudio.", variant: "destructive"});
+    if (!currentStudio) {
+      toast({
+        title: 'Error',
+        description: 'No se ha podido identificar el estudio.',
+        variant: 'destructive',
+      });
       return;
     }
 
     setIsSaving(true);
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    const formData = new FormData(event.currentTarget);
+    const displayName = formData.get('name') as string;
     const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
     const roleId = formData.get('roleId') as string;
-    const name = formData.get('name') as string || email.split('@')[0];
-
-    // In a real app, you would ideally use the UID from Firebase Auth as the ID
-    const memberId = editingMember?.id || email;
 
     try {
-        if (email && roleId && name) {
-            await addOrUpdateStaffMember(studioId, { id: memberId, name, email, roleId });
-            await refreshData();
-            setOpen(false);
-            setEditingMember(null);
-            toast({ title: "¡Éxito!", description: "El miembro del personal se ha guardado correctamente." });
-        } else {
-            throw new Error("Por favor, completa todos los campos.");
-        }
-    } catch(error: any) {
-        toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
+      await createStaffUserFn({
+        studioId: currentStudio.id,
+        email,
+        password,
+        displayName,
+        roleId,
+        globalRole: 'owner',
+      });
+      await refreshData();
+      setIsDialogOpen(false);
+      toast({
+        title: '¡Éxito!',
+        description: 'El nuevo miembro del personal ha sido creado y añadido.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error al crear',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
-        setIsSaving(false);
+      setIsSaving(false);
     }
   };
 
-  const handleDelete = async (userId: string) => {
-      if (!studioId) {
-        toast({ title: "Error", description: "No se ha podido identificar el estudio.", variant: "destructive"});
-        return;
-      }
-      if (confirm('¿Estás seguro de que quieres eliminar a este miembro del equipo?')) {
-          try {
-            await deleteStaffMember(studioId, userId);
-            await refreshData();
-            toast({ title: "Miembro Eliminado" });
-          } catch(e) {
-            toast({ title: "Error", description: "No se pudo eliminar al miembro.", variant: "destructive" });
-          }
-      }
-  }
-  
-  const getRoleName = (roleId: string) => {
-    return roles.find(r => r.id === roleId)?.name || 'Sin Rol';
-  }
-  
+  const handleDelete = async (member: StaffMemberWithRole) => {
+     if (!currentStudio) {
+      toast({ title: "Error", description: "No se ha podido identificar el estudio.", variant: "destructive"});
+      return;
+    }
+    if (confirm(`¿Estás seguro de que quieres eliminar a ${member.displayName}?`)) {
+        console.log("Deletion logic needs a backend Cloud Function for Auth deletion.");
+        toast({ title: "Funcionalidad no implementada", description: "La eliminación de usuarios debe realizarse desde un entorno seguro." });
+    }
+  };
+
+  const getRoleName = (roleId: string) =>
+    studioRoles.find((r) => r.id === roleId)?.name || 'Sin Rol';
+
   if (loading) {
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Gestión de Personal</h1>
-                <Button disabled><PlusCircle className="mr-2 h-4 w-4" />Añadir Personal</Button>
-            </div>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Tu Equipo</CardTitle>
-                    <CardDescription>Gestiona los miembros de tu personal y sus roles.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center justify-center py-10">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        <p className="ml-4 text-muted-foreground">Cargando personal...</p>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+      <div className="flex h-64 w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin" />
+      </div>
+    );
+  }
+  
+  if (!currentStudio) {
+    return (
+      <div className="text-center">
+        <h1 className="text-2xl font-bold">Gestión de Personal</h1>
+        <p className="text-muted-foreground">
+          Por favor, selecciona un estudio para ver su personal.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Gestión de Personal</h1>
-            <Button onClick={() => handleOpenDialog(null)}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Añadir Personal
-            </Button>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Gestión de Personal</h1>
+        <Button onClick={() => setIsDialogOpen(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Añadir Personal
+        </Button>
+      </div>
       <Card>
         <CardHeader>
-          <CardTitle>Tu Equipo</CardTitle>
+          <CardTitle>Tu Equipo en {currentStudio.name}</CardTitle>
           <CardDescription>
             Gestiona los miembros de tu personal y sus roles.
           </CardDescription>
@@ -155,87 +195,99 @@ export default function StaffPageClient() {
               <TableRow>
                 <TableHead>Miembro</TableHead>
                 <TableHead>Rol</TableHead>
-                <TableHead><span className="sr-only">Acciones</span></TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {staff.map((member) => {
-                  const avatarFallback = member.name.split(' ').map(n => n[0]).join('');
-                  return (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={member.avatar || `https://placehold.co/40x40.png?text=${avatarFallback}`} />
-                            <AvatarFallback>{avatarFallback}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{member.name}</div>
-                            <div className="text-sm text-muted-foreground">{member.email}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={member.roleId === "super_admin" ? "destructive" : (member.roleId === "owner" ? "default" : "secondary")}>{getRoleName(member.roleId)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" /><span className="sr-only">Menú</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleOpenDialog(member)}>Editar Rol</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(member.id)}>Eliminar del Equipo</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+              {staff.map((member) => (
+                <TableRow key={member.uid}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={member.photoURL || `https://avatar.vercel.sh/${member.email}.png`} />
+                        <AvatarFallback>{member.displayName?.slice(0, 2)}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{member.displayName}</div>
+                        <div className="text-sm text-muted-foreground">{member.email}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={member.roleId === 'owner' ? 'default' : 'secondary'}>
+                      {getRoleName(member.roleId)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(member)}
+                      disabled={currentUser?.uid === member.uid}
+                    >
+                      Eliminar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setEditingMember(null); }}>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
-            <form onSubmit={handleSaveMember}>
-                <DialogHeader>
-                    <DialogTitle>{editingMember ? 'Editar Miembro' : 'Añadir Nuevo Miembro'}</DialogTitle>
-                    <DialogDescription>
-                        {editingMember ? 'Actualiza el rol de este miembro.' : 'Introduce los datos y asígnale un rol.'}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">Nombre</Label>
-                        <Input id="name" name="name" defaultValue={editingMember?.name} placeholder="Nombre Apellido" className="col-span-3" required />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="email" className="text-right">Correo</Label>
-                        <Input id="email" name="email" type="email" defaultValue={editingMember?.email} placeholder="staff@example.com" className="col-span-3" required disabled={!!editingMember}/>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="roleId" className="text-right">Rol</Label>
-                        <Select name="roleId" defaultValue={editingMember?.roleId} required>
-                            <SelectTrigger className="col-span-3"><SelectValue placeholder="Selecciona un rol" /></SelectTrigger>
-                            <SelectContent>
-                                {roles.map(role => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button type="submit" disabled={isSaving}>
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {editingMember ? 'Guardar Cambios' : 'Añadir Miembro'}
-                    </Button>
-                </DialogFooter>
-            </form>
+          <form onSubmit={handleCreateStaff}>
+            <DialogHeader>
+              <DialogTitle>Añadir Nuevo Personal</DialogTitle>
+              <DialogDescription>
+                Crea una nueva cuenta para un miembro de tu equipo y asígnale un
+                rol.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">Nombre</Label>
+                <Input id="name" name="name" className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">Correo</Label>
+                <Input id="email" name="email" type="email" className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">Contraseña</Label>
+                <Input id="password" name="password" type="password" className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="roleId" className="text-right">Rol</Label>
+                <Select name="roleId" required>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Selecciona un rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {studioRoles
+                      .filter((r) => r.id !== 'owner')
+                      .map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Crear Miembro
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
-    </Dialog>
+      </Dialog>
     </div>
-  )
+  );
 }

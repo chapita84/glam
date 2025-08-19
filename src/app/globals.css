@@ -1,76 +1,78 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+ 
 @layer base {
   :root {
-    /* Based on blueprint.md */
-    --background: 276 44% 95%; /* Light Lavender */
+    /* Theme generated from blueprint.md */
+    --background: 276 44% 95%; /* #F5EEF8 (Very light lavender) */
     --foreground: 271 76% 15%; /* Dark Plum for text */
 
-    --card: 276 44% 100%; /* White cards */
+    --card: 276 44% 100%; /* White */
     --card-foreground: 271 76% 15%;
- 
+
     --popover: 276 44% 100%;
     --popover-foreground: 271 76% 15%;
- 
-    --primary: 271 76% 31%; /* Deep Plum */
+
+    --primary: 271 76% 31%; /* #4A148C (Deep plum) */
     --primary-foreground: 0 0% 98%;
- 
-    --secondary: 276 44% 90%; /* Lighter Lavender */
+
+    --secondary: 276 44% 90%; /* Lighter lavender */
     --secondary-foreground: 271 76% 31%;
- 
-    --muted: 276 44% 90%;
+
+    --muted: 276 44% 85%;
     --muted-foreground: 271 76% 40%;
- 
-    --accent: 333 100% 53%; /* Dusty Rose / Pink for CTA */
+
+    --accent: 25 78% 50%; /* #D2691E (Dusty rose / SaddleBrown) */
     --accent-foreground: 0 0% 98%;
- 
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 276 44% 85%;
-    --input: 276 44% 90%;
+    --border: 271 76% 80%;
+    --input: 271 76% 85%;
     --ring: 271 76% 31%;
- 
-    --radius: 0.5rem;
 
+    --radius: 0.5rem;
+    
     /* Custom Sidebar Colors */
     --sidebar: 271 76% 18%; /* Darker Plum */
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 333 100% 70%; /* Brighter Pink for highlights */
   }
- 
+
   .dark {
-    /* Dark Theme adjusted from blueprint */
-    --background: 271 76% 5%;
+    /* Dark Theme derived from blueprint.md */
+    --background: 271 76% 8%;
     --foreground: 0 0% 98%;
 
-    --card: 271 76% 8%;
+    --card: 271 76% 12%;
     --card-foreground: 0 0% 98%;
- 
-    --popover: 271 76% 8%;
+
+    --popover: 271 76% 12%;
     --popover-foreground: 0 0% 98%;
- 
-    --primary: 333 100% 70%;
+
+    --primary: 271 76% 65%; /* Lighter plum for dark mode */
     --primary-foreground: 271 76% 10%;
- 
-    --secondary: 271 76% 15%;
+
+    --secondary: 271 76% 20%;
     --secondary-foreground: 0 0% 98%;
- 
-    --muted: 271 76% 15%;
-    --muted-foreground: 271 76% 60%;
- 
-    --accent: 333 100% 53%;
+
+    --muted: 271 76% 20%;
+    --muted-foreground: 271 76% 65%;
+
+    --accent: 25 78% 60%; /* Lighter dusty rose for dark mode */
     --accent-foreground: 0 0% 98%;
- 
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 271 76% 15%;
-    --input: 271 76% 15%;
-    --ring: 333 100% 53%;
+    --border: 271 76% 20%;
+    --input: 271 76% 20%;
+    --ring: 25 78% 60%;
+
+    /* Custom Sidebar Colors */
+    --sidebar: 271 76% 12%;
+    --sidebar-foreground: 0 0% 98%;
   }
 }
  
@@ -80,5 +82,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

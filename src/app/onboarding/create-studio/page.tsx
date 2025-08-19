@@ -1,32 +1,50 @@
 
 'use client'
 
-import { createStudio } from "@/lib/firebase/firestore";
-import { useAuth } from "@/hooks/use-auth";
+import { createStudio, type Studio } from "@/lib/firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useStudio } from "@/contexts/StudioContext";
 
 export default function CreateStudioPage() {
-    const { user, loading } = useAuth();
+    const { currentUser, loading: authLoading } = useAuth();
+    const { setSelectedStudio } = useStudio();
     const router = useRouter();
     const [isCreating, setIsCreating] = useState(false);
     const { toast } = useToast();
 
+    // Redirect if user is not logged in after loading has completed
+    useEffect(() => {
+        if (!authLoading && !currentUser) {
+            toast({ title: "Acceso Denegado", description: "Debes iniciar sesión para crear un estudio.", variant: "destructive" });
+            router.push('/login');
+        }
+    }, [authLoading, currentUser, router, toast]);
+
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
+        // Double-check user existence before submission
+        if (!currentUser) {
+            toast({ title: "Error", description: "El usuario no está disponible. Por favor, intenta de nuevo.", variant: "destructive" });
+            return;
+        }
+
         setIsCreating(true);
         const formData = new FormData(event.currentTarget);
         const studioName = formData.get("studioName") as string;
 
-        if (user && studioName) {
+        if (studioName) {
             try {
-                await createStudio(studioName, user);
+                const newStudio: Studio = await createStudio(studioName, currentUser);
+                setSelectedStudio(newStudio);
                 toast({ title: "¡Estudio Creado!", description: "Bienvenido a tu nuevo espacio de gestión." });
                 router.push('/dashboard');
             } catch (error: any) {
@@ -34,12 +52,13 @@ export default function CreateStudioPage() {
                 setIsCreating(false);
             }
         } else {
-             toast({ title: "Error", description: "Debes iniciar sesión y proporcionar un nombre para el estudio.", variant: "destructive" });
+             toast({ title: "Error", description: "Por favor, proporciona un nombre para el estudio.", variant: "destructive" });
              setIsCreating(false);
         }
     };
 
-    if (loading) {
+    // Show a loader while auth is being verified
+    if (authLoading || !currentUser) {
         return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 

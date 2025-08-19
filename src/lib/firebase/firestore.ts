@@ -1,327 +1,211 @@
 
 import { db } from './config';
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp, getDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Role, Permission } from '@/lib/types';
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+  getDoc,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  writeBatch,
+  Timestamp,
+} from 'firebase/firestore';
+import {
+  type UserProfile,
+  type Studio,
+  type StudioRole,
+  type StudioMember,
+  type Service,
+  type Budget,
+  type Appointment,
+  type TimeBlock,
+} from '@/lib/types';
+import { ALL_PERMISSIONS, getAllPermissionIds } from '@/lib/permissions';
 
-// Helper to get all permission IDs
-const getAllPermissionIds = (permissions: Permission[]): string[] => {
-    return permissions.flatMap(p => [p.id, ...(p.children ? getAllPermissionIds(p.children) : [])]);
-};
+// --- User Profile Functions ---
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const docRef = doc(db, 'users', uid);
+  const docSnap = await getDoc(docRef);
+  return docSnap.exists() ? (docSnap.data() as UserProfile) : null;
+}
 
-// =================================================================
-// Type Definitions
-// =================================================================
-
-export type Studio = {
-    id: string;
-    name: string;
-    ownerId: string;
-    logoUrl?: string;
-    createdAt: any;
-    location?: string;
-    phone?: string;
-    description?: string;
-};
-
-type RoleFirestoreData = Omit<Role, 'permissions'> & { permissions: string[] };
-
-export type StaffMember = {
-  id: string;
-  name: string;
+export async function createUserProfile(user: {
+  uid: string;
   email: string;
-  roleId: string;
-  avatar?: string;
-  joinedAt?: any; 
-};
-
-export type Service = {
-  id: string;
-  name: string;
-  category: string;
-  duration: number;
-  price: number;
+  displayName?: string;
+  photoURL?: string;
+  globalRole: 'owner' | 'customer' | 'superAdmin';
+}): Promise<void> {
+  const userDocRef = doc(db, 'users', user.uid);
+  const profile: UserProfile = {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName || '',
+    photoURL: user.photoURL || '',
+    globalRole: user.globalRole,
+  };
+  await setDoc(userDocRef, profile);
 }
 
-export type Booking = { id: string; clientId: string; clientName: string; staffId: string; staffName: string; serviceId: string; serviceName: string; duration: number; startTime: Date; endTime: Date; status: 'confirmed' | 'completed' | 'canceled_by_user' | 'canceled_by_studio' | 'no_show'; price: { amount: number; currency: string; }; createdAt?: any; notes?: string; }
-export type Budget = { id?: string; budgetName: string; clientName: string; status: 'draft' | 'sent' | 'approved' | 'rejected'; createdAt?: any; updatedAt?: any; eventInfo: any; items: any[]; summary: any; totalDuration?: number; }
-export type WorkingHour = { dayOfWeek: number; startTime: string; endTime: string; enabled: boolean; }
-export type StudioConfig = { workingHours: WorkingHour[]; }
-export type TimeBlock = {
-    id: string;
-    startTime: Date;
-    endTime: Date;
-    reason: string; // e.g., 'Vacation', 'Personal', 'Event'
-    isAllDay: boolean;
-    createdAt?: any;
+// --- Studio Functions ---
+export async function createStudio(
+  studioName: string,
+  ownerProfile: UserProfile
+): Promise<Studio> {
+  const batch = writeBatch(db);
+  const studioDocRef = doc(collection(db, 'studios'));
+  const studioData: Studio = {
+    id: studioDocRef.id,
+    name: studioName,
+    slug: studioName.toLowerCase().replace(/\s+/g, '-'),
+    ownerId: ownerProfile.uid,
+  };
+  batch.set(studioDocRef, studioData);
+
+  const allPermissionIds = getAllPermissionIds(ALL_PERMISSIONS);
+  const ownerRole: StudioRole = { id: 'owner', name: 'Propietario', permissions: allPermissionIds };
+  const roleDocRef = doc(db, 'studios', studioDocRef.id, 'roles', 'owner');
+  batch.set(roleDocRef, ownerRole);
+
+  const memberData: StudioMember = { userId: ownerProfile.uid, studioId: studioDocRef.id, roleId: 'owner' };
+  const memberDocRef = doc(collection(db, 'studio_members'), `${ownerProfile.uid}_${studioDocRef.id}`);
+  batch.set(memberDocRef, memberData);
+
+  await batch.commit();
+  return studioData;
 }
 
-
-// =================================================================
-// Initial Data Seeding for a NEW Studio
-// =================================================================
-
-async function seedInitialDataForStudio(studioId: string, owner: { uid: string, email?: string | null, displayName?: string | null }) {
-    console.log(`Seeding initial data for new studio: ${studioId}`);
-    
-    const allPermissions: Permission[] = [
-        { id: "agenda", label: "Agenda", children: [{ id: "agenda_view", label: "Ver" }, { id: "agenda_manage", label: "Gestionar" }] },
-        { id: "management", label: "Gestión", children: [{ id: "services_manage", label: "Gestionar Servicios" }, { id: "staff_manage", label: "Gestionar Personal" }, { id: "budgets_manage", label: "Gestionar Presupuestos" }, {id: "studios_manage", label: "Gestionar Estudios"}] },
-        { id: "config", label: "Configuración", children: [{ id: "roles_manage", label: "Gestionar Roles" }, { id: "settings_manage", label: "Gestionar Ajustes" }, { id: "billing_manage", label: "Gestionar Facturación" }] },
-        { id: "reports_view", label: "Ver Reportes" },
-    ];
-    const allPermissionIds = getAllPermissionIds(allPermissions);
-    
-    const ownerRole = { id: 'owner', name: 'Propietario', description: 'Rol con permisos para gestionar el estudio.', permissions: allPermissionIds };
-    const superAdminRole = { id: 'super_admin', name: 'Super Admin', description: 'Rol con permisos para gestionar la plataforma.', permissions: allPermissionIds };
-    await addOrUpdateRole(studioId, ownerRole);
-    await addOrUpdateRole(studioId, superAdminRole);
-
-    const ownerStaffMember: StaffMember = {
-        id: owner.uid,
-        name: owner.displayName || 'Super Admin',
-        email: owner.email || 'superadmin@example.com',
-        roleId: 'super_admin',
-    };
-    await addOrUpdateStaffMember(studioId, ownerStaffMember);
-
-    const defaultServices: Service[] = [
-        { id: 'corte-de-pelo', name: 'Corte de Cabello', category: 'Peluquería', duration: 60, price: 50 },
-        { id: 'manicura-clasica', name: 'Manicura Clásica', category: 'Uñas', duration: 30, price: 25 },
-    ];
-    for (const service of defaultServices) {
-        await addOrUpdateService(studioId, service);
-    }
-    
-    console.log(`Finished seeding data for studio: ${studioId}`);
-}
-
-// =================================================================
-// Studio Management (Main Collection)
-// =================================================================
-
-export async function createStudio(studioName: string, owner: { uid: string, email?: string | null, displayName?: string | null }): Promise<string> {
-    const studioDocRef = doc(collection(db, 'studios'));
-    const studioData: Studio = {
-        id: studioDocRef.id,
-        name: studioName,
-        ownerId: owner.uid,
-        createdAt: serverTimestamp(),
-    };
-    try {
-        await setDoc(studioDocRef, studioData);
-        await seedInitialDataForStudio(studioDocRef.id, owner);
-        return studioDocRef.id;
-    } catch (error: any) {
-        console.error("Firebase Error creating studio: ", error.code, error.message);
-        // This will give us a clear idea of what's failing, e.g., 'permission-denied'
-        throw new Error(`Failed to create studio: ${error.message}`);
-    }
-}
-
-export async function getStudioForUser(userId: string): Promise<Studio | null> {
-    const q = query(collection(db, 'studios'), where('ownerId', '==', userId));
-    try {
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-            return querySnapshot.docs[0].data() as Studio;
-        }
-        return null;
-    } catch (error) {
-        console.error("Error fetching studio for user: ", error);
-        return null;
-    }
-}
-
+// THIS IS THE FIX: Reads from the public collection
 export async function getAllStudios(): Promise<Studio[]> {
-    try {
-        const q = query(collection(db, 'studios'), orderBy('name'));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => doc.data() as Studio);
-    } catch (error) {
-        console.error("Error fetching all studios: ", error);
-        return [];
-    }
+  const q = query(collection(db, 'studios_public'), orderBy('name'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map((doc) => doc.data() as Studio);
 }
 
-export async function updateStudio(studioId: string, data: Partial<Omit<Studio, 'id'>>): Promise<void> {
-    const studioDocRef = doc(db, 'studios', studioId);
-    try {
-        await updateDoc(studioDocRef, data);
-    } catch (error) {
-        console.error("Error updating studio: ", error);
-        throw error;
-    }
+// --- Staff / Studio Member Functions ---
+export async function getStaffForStudio(studioId: string): Promise<(UserProfile & { roleId: string })[]> {
+  const membersQuery = query(collection(db, 'studio_members'), where('studioId', '==', studioId));
+  const membersSnap = await getDocs(membersQuery);
+  const members = membersSnap.docs.map((d) => d.data() as StudioMember);
+
+  if (members.length === 0) return [];
+
+  const userIds = members.map((m) => m.userId);
+  const usersQuery = query(collection(db, 'users'), where('uid', 'in', userIds));
+  const usersSnap = await getDocs(usersQuery);
+  const users = usersSnap.docs.map((d) => d.data() as UserProfile);
+
+  return users.map((user) => {
+    const membership = members.find((m) => m.userId === user.uid);
+    return { ...user, roleId: membership?.roleId || '' };
+  });
 }
 
-// =================================================================
-// Subcollection Management (Roles, Staff, Services, etc. under a specific Studio)
-// =================================================================
-
-export async function getRoles(studioId: string): Promise<Role[]> {
-    const rolesCollectionRef = collection(db, 'studios', studioId, 'roles');
-    const querySnapshot = await getDocs(rolesCollectionRef);
-    return querySnapshot.docs.map(doc => {
-        const data = doc.data() as RoleFirestoreData;
-        return { ...data, permissions: new Set(data.permissions || []) };
-    });
+// --- Studio Role Functions ---
+export async function getStudioRoles(studioId: string): Promise<StudioRole[]> {
+  const colRef = collection(db, 'studios', studioId, 'roles');
+  const snapshot = await getDocs(colRef);
+  return snapshot.docs.map(
+    (d) => ({ ...d.data(), id: d.id } as StudioRole)
+  );
 }
 
-export async function addOrUpdateRole(studioId: string, role: Omit<Role, 'permissions'> & { permissions: Set<string> | string[] }): Promise<void> {
-    const roleDocRef = doc(db, 'studios', studioId, 'roles', role.id);
-    const roleData: RoleFirestoreData = { ...role, permissions: Array.from(role.permissions) };
-    await setDoc(roleDocRef, roleData, { merge: true });
+export async function addOrUpdateStudioRole(
+  studioId: string,
+  role: Omit<StudioRole, 'id'> & { id?: string }
+): Promise<void> {
+    const docId = role.id || role.name!.toLowerCase().replace(/\s+/g, '_');
+    const docRef = doc(db, 'studios', studioId, 'roles', docId);
+    await setDoc(docRef, { ...role, id: docId }, { merge: true });
 }
 
-export async function deleteRole(studioId: string, roleId: string): Promise<void> {
-    try {
-        await deleteDoc(doc(db, 'studios', studioId, 'roles', roleId));
-    } catch (error) {
-        console.error(`Failed to delete role ${roleId} from studio ${studioId}:`, error);
-        throw error;
-    }
+export async function deleteStudioRole(
+  studioId: string,
+  roleId: string
+): Promise<void> {
+  await deleteDoc(doc(db, 'studios', studioId, 'roles', roleId));
 }
 
-export async function getStaff(studioId: string): Promise<StaffMember[]> {
-    const staffCollectionRef = collection(db, 'studios', studioId, 'staff');
-    const querySnapshot = await getDocs(staffCollectionRef);
-    return querySnapshot.docs.map(doc => doc.data() as StaffMember);
+
+// --- Service Functions ---
+export async function getServicesForStudio(studioId: string): Promise<Service[]> {
+  const colRef = collection(db, 'studios', studioId, 'services');
+  const snapshot = await getDocs(colRef);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as Service));
 }
 
-export async function addOrUpdateStaffMember(studioId: string, member: Omit<StaffMember, 'joinedAt'>): Promise<void> {
-    const staffDocRef = doc(db, 'studios', studioId, 'staff', member.id);
-    await setDoc(staffDocRef, { ...member, joinedAt: serverTimestamp() }, { merge: true });
+export async function addOrUpdateService(
+  studioId: string,
+  service: Partial<Service>
+): Promise<void> {
+  const docRef = service.id ? doc(db, 'studios', studioId, 'services', service.id) : doc(collection(db, 'studios', studioId, 'services'));
+  await setDoc(docRef, { ...service, id: docRef.id }, { merge: true });
 }
 
-export async function deleteStaffMember(studioId: string, userId: string): Promise<void> {
-    try {
-        await deleteDoc(doc(db, 'studios', studioId, 'staff', userId));
-    } catch (error) {
-        console.error(`Failed to delete staff member ${userId} from studio ${studioId}:`, error);
-        throw error;
-    }
+export async function deleteService(
+  studioId: string,
+  serviceId: string
+): Promise<void> {
+  await deleteDoc(doc(db, 'studios', studioId, 'services', serviceId));
 }
 
-export async function getServices(studioId: string): Promise<Service[]> {
-    const servicesCollectionRef = collection(db, 'studios', studioId, 'services');
-    const querySnapshot = await getDocs(servicesCollectionRef);
-    return querySnapshot.docs.map(doc => doc.data() as Service);
+// --- Appointment/Booking Functions ---
+export async function getAppointments(studioId: string, start: Date, end: Date): Promise<Appointment[]> {
+  const colRef = collection(db, 'studios', studioId, 'appointments');
+  const q = query(colRef, where('start', '>=', Timestamp.fromDate(start)), where('start', '<=', Timestamp.fromDate(end)));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(d => {
+      const data = d.data();
+      return { ...data, id: d.id, start: (data.start as Timestamp).toDate(), end: (data.end as Timestamp).toDate() } as Appointment;
+  });
 }
 
-export async function addOrUpdateService(studioId: string, service: Service): Promise<void> {
-    await setDoc(doc(db, 'studios', studioId, 'services', service.id), service, { merge: true });
+export async function addOrUpdateAppointment(studioId: string, appt: Omit<Appointment, 'id'> & { id?: string }): Promise<void> {
+    const docRef = appt.id ? doc(db, 'studios', studioId, 'appointments', appt.id) : doc(collection(db, 'studios', studioId, 'appointments'));
+    await setDoc(docRef, { ...appt, id: docRef.id }, { merge: true });
 }
 
-export async function deleteService(studioId: string, serviceId: string): Promise<void> {
-    try {
-        await deleteDoc(doc(db, 'studios', studioId, 'services', serviceId));
-    } catch (error) {
-        console.error(`Failed to delete service ${serviceId} from studio ${studioId}:`, error);
-        throw error;
-    }
+export async function deleteAppointment(studioId: string, apptId: string): Promise<void> {
+    await deleteDoc(doc(db, 'studios', studioId, 'appointments', apptId));
 }
 
-export async function getBookings(studioId: string): Promise<Booking[]> {
-    const bookingsCollectionRef = collection(db, 'studios', studioId, 'bookings');
-    const querySnapshot = await getDocs(bookingsCollectionRef);
-    return querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        const startTime = data.startTime?.toDate ? data.startTime.toDate() : new Date();
-        return {
-            ...data,
-            id: doc.id,
-            startTime,
-            endTime: new Date(startTime.getTime() + data.duration * 60000),
-        } as Booking;
-    });
-}
-
-export async function addOrUpdateBooking(studioId: string, booking: Omit<Booking, 'id' | 'createdAt' | 'endTime'> & { id?: string }): Promise<void> {
-    const docRef = booking.id ? doc(db, 'studios', studioId, 'bookings', booking.id) : doc(collection(db, 'studios', studioId, 'bookings'));
-    const bookingData = { ...booking, id: docRef.id, createdAt: serverTimestamp() };
-    await setDoc(docRef, bookingData, { merge: true });
-}
-
-export async function deleteBooking(studioId: string, bookingId: string): Promise<void> {
-    try {
-        await deleteDoc(doc(db, 'studios', studioId, 'bookings', bookingId));
-    } catch (error) {
-        console.error(`Failed to delete booking ${bookingId} from studio ${studioId}:`, error);
-        throw error;
-    }
-}
-
-export async function getBudgets(studioId: string): Promise<Budget[]> {
-    const budgetsCollectionRef = collection(db, 'studios', studioId, 'budgets');
-    const q = query(budgetsCollectionRef, orderBy('createdAt', 'desc'));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Budget);
-}
-
-export async function addOrUpdateBudget(studioId: string, budget: Omit<Budget, 'id'|'createdAt'|'updatedAt'> & {id?: string}): Promise<string> {
-    const docRef = budget.id ? doc(db, 'studios', studioId, 'budgets', budget.id) : doc(collection(db, 'studios', studioId, 'budgets'));
-    const budgetData = { ...budget, id: docRef.id, updatedAt: serverTimestamp() } as any;
-    if (!budget.id) {
-        budgetData.createdAt = serverTimestamp();
-    }
-    await setDoc(docRef, budgetData, { merge: true });
-    return docRef.id;
-}
-
-export async function deleteBudget(studioId: string, budgetId: string): Promise<void> {
-    try {
-        await deleteDoc(doc(db, 'studios', studioId, 'budgets', budgetId));
-    } catch (error) {
-        console.error(`Failed to delete budget ${budgetId} from studio ${studioId}:`, error);
-        throw error;
-    }
-}
-
-export async function getStudioConfig(studioId: string): Promise<StudioConfig | null> {
-    const configDocRef = doc(db, 'studios', studioId);
-    const docSnap = await getDoc(configDocRef);
-    const data = docSnap.data() as { config?: StudioConfig };
-    return data?.config || null;
-}
-
-export async function updateStudioConfig(studioId: string, config: StudioConfig): Promise<void> {
-    await setDoc(doc(db, 'studios', studioId), { config }, { merge: true });
-}
-
-export async function uploadFile(file: File, path: string): Promise<string> {
-    const storage = getStorage();
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
-}
-
+// --- Time Block Functions ---
 export async function getTimeBlocks(studioId: string, start: Date, end: Date): Promise<TimeBlock[]> {
-    const timeBlocksCollectionRef = collection(db, 'studios', studioId, 'timeblocks');
-    const q = query(timeBlocksCollectionRef, where('startTime', '>=', start), where('startTime', '<=', end));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            startTime: data.startTime.toDate(),
-            endTime: data.endTime.toDate(),
-            reason: data.reason,
-            isAllDay: data.isAllDay
-        } as TimeBlock;
+    const colRef = collection(db, 'studios', studioId, 'time_blocks');
+    const q = query(colRef, where('start', '>=', Timestamp.fromDate(start)), where('start', '<=', Timestamp.fromDate(end)));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => {
+        const data = d.data();
+        return { ...data, id: d.id, start: (data.start as Timestamp).toDate(), end: (data.end as Timestamp).toDate() } as TimeBlock;
     });
 }
 
-export async function addOrUpdateTimeBlock(studioId: string, block: Omit<TimeBlock, 'id' | 'createdAt'> & { id?: string }): Promise<void> {
-    const docRef = block.id ? doc(db, 'studios', studioId, 'timeblocks', block.id) : doc(collection(db, 'studios', studioId, 'timeblocks'));
-    const blockData = { ...block, id: docRef.id, createdAt: serverTimestamp() };
-    await setDoc(docRef, blockData, { merge: true });
+export async function addOrUpdateTimeBlock(studioId: string, block: Omit<TimeBlock, 'id'> & { id?: string }): Promise<void> {
+    const docRef = block.id ? doc(db, 'studios', studioId, 'time_blocks', block.id) : doc(collection(db, 'studios', studioId, 'time_blocks'));
+    await setDoc(docRef, { ...block, id: docRef.id }, { merge: true });
 }
 
 export async function deleteTimeBlock(studioId: string, blockId: string): Promise<void> {
-    try {
-        await deleteDoc(doc(db, 'studios', studioId, 'timeblocks', blockId));
-    } catch (error) {
-        console.error(`Failed to delete time block ${blockId} from studio ${studioId}:`, error);
-        throw error;
-    }
+    await deleteDoc(doc(db, 'studios', studioId, 'time_blocks', blockId));
+}
+
+// --- Budgets ---
+export async function getBudgets(studioId: string): Promise<Budget[]> {
+    const colRef = collection(db, 'studios', studioId, 'budgets');
+    const snapshot = await getDocs(colRef);
+    return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Budget));
+}
+
+export async function addOrUpdateBudget(studioId: string, budget: Omit<Budget, 'id'> & { id?: string }): Promise<void> {
+    const docRef = budget.id ? doc(db, 'studios', studioId, 'budgets', budget.id) : doc(collection(db, 'studios', studioId, 'budgets'));
+    await setDoc(docRef, { ...budget, id: docRef.id }, { merge: true });
+}
+
+export async function deleteBudget(studioId: string, budgetId: string): Promise<void> {
+  await deleteDoc(doc(db, 'studios', studioId, 'budgets', budgetId));
 }

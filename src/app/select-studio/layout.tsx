@@ -1,15 +1,13 @@
+'use client';
 
-'use client'
+import { ReactNode } from 'react';
 
-import { AuthProvider } from "@/contexts/AuthContext";
-import type { PropsWithChildren } from "react";
-
-export default function SelectStudioLayout({ children }: PropsWithChildren) {
+// This is a simple layout that just centers its content,
+// without the complex redirection logic of the main AppLayout.
+export default function SelectStudioLayout({ children }: { children: ReactNode }) {
     return (
-        <AuthProvider>
-            <div className="flex h-screen w-full items-center justify-center bg-background">
-                {children}
-            </div>
-        </AuthProvider>
-    )
+        <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+            {children}
+        </div>
+    );
 }

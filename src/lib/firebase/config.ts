@@ -1,15 +1,17 @@
-
 // src/lib/firebase/config.ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
+// New, direct configuration for glamdash-v2
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyAW8yejnIrZbO4MqYmCNbGmAAhlRkwQh90",
+  authDomain: "glamdash-v2.firebaseapp.com",
+  projectId: "glamdash-v2",
+  storageBucket: "glamdash-v2.appspot.com",
+  messagingSenderId: "728543552523",
+  appId: "1:728543552523:web:0b9ce3020049134101130e",
+  measurementId: "G-7ZPGYNE36X"
 };
 
 // Initialize Firebase for the client
