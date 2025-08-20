@@ -1,0 +1,348 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Search, MapPin, Star, Clock, DollarSign, Calendar, User, Settings } from 'lucide-react';
+import { getAllStudios, getServicesForStudio } from '@/lib/firebase/firestore';
+import { Studio, Service } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+interface StudioWithServices extends Studio {
+  services?: Service[];
+}
+
+export default function CustomerPage() {
+  const { profile, logout } = useAuth();
+  const router = useRouter();
+  const [studios, setStudios] = useState<StudioWithServices[]>([]);
+  const [filteredStudios, setFilteredStudios] = useState<StudioWithServices[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedService, setSelectedService] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showSearch, setShowSearch] = useState(false);
+
+  if (!profile || profile.globalRole !== 'customer') {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <p>Acceso no autorizado</p>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    const fetchStudiosAndServices = async () => {
+      if (!showSearch) return;
+      
+      try {
+        setLoading(true);
+        const allStudios = await getAllStudios();
+        
+        // Cargar servicios para cada estudio
+        const studiosWithServices = await Promise.all(
+          allStudios.map(async (studio) => {
+            try {
+              const services = await getServicesForStudio(studio.id);
+              return { ...studio, services };
+            } catch (error) {
+              console.error(`Error loading services for studio ${studio.id}:`, error);
+              return { ...studio, services: [] };
+            }
+          })
+        );
+        
+        setStudios(studiosWithServices);
+        setFilteredStudios(studiosWithServices);
+      } catch (error) {
+        console.error('Error fetching studios:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudiosAndServices();
+  }, [showSearch]);
+
+  useEffect(() => {
+    if (!showSearch) return;
+    
+    let filtered = studios;
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        studio =>
+          studio.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          studio.services?.some(service =>
+            service.name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+      );
+    }
+
+    if (selectedService) {
+      filtered = filtered.filter(studio =>
+        studio.services?.some(service =>
+          service.name.toLowerCase().includes(selectedService.toLowerCase())
+        )
+      );
+    }
+
+    setFilteredStudios(filtered);
+  }, [searchTerm, selectedService, studios, showSearch]);
+
+  const handleBookAppointment = (studioId: string, serviceId?: string) => {
+    router.push(`/customer/book/${studioId}${serviceId ? `?service=${serviceId}` : ''}`);
+  };
+
+  const getAllServices = () => {
+    const allServices = studios.flatMap(studio => studio.services || []);
+    const uniqueServices = allServices.reduce((acc, service) => {
+      if (!acc.find(s => s.name === service.name)) {
+        acc.push(service);
+      }
+      return acc;
+    }, [] as Service[]);
+    return uniqueServices;
+  };
+
+  if (showSearch) {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+            <p className="mt-4 text-lg">Cargando estudios...</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="container mx-auto px-4 py-8">
+        {/* Header con botón de volver */}
+        <div className="mb-8">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowSearch(false)}
+            className="mb-4"
+          >
+            ← Volver al inicio
+          </Button>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Buscar Estudios y Servicios
+          </h1>
+          <p className="text-gray-600">
+            Descubre y agenda servicios en los mejores estudios de belleza
+          </p>
+        </div>
+
+        {/* Filtros de búsqueda */}
+        <div className="mb-8 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Buscar estudios o servicios..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="md:w-64">
+              <select
+                value={selectedService}
+                onChange={(e) => setSelectedService(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Todos los servicios</option>
+                {getAllServices().map((service) => (
+                  <option key={service.id} value={service.name}>
+                    {service.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de estudios */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredStudios.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <p className="text-gray-500 text-lg">
+                No se encontraron estudios que coincidan con tu búsqueda
+              </p>
+            </div>
+          ) : (
+            filteredStudios.map((studio) => (
+              <Card key={studio.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl">{studio.name}</CardTitle>
+                    <Badge variant="secondary">
+                      {studio.services?.length || 0} servicios
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Servicios del estudio */}
+                    {studio.services && studio.services.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-2">Servicios disponibles:</h4>
+                        <div className="space-y-2">
+                          {studio.services.slice(0, 3).map((service) => (
+                            <div
+                              key={service.id}
+                              className="flex items-center justify-between p-2 bg-gray-50 rounded-md"
+                            >
+                              <div>
+                                <p className="font-medium text-sm">{service.name}</p>
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{service.duration}min</span>
+                                  <DollarSign className="h-3 w-3" />
+                                  <span>${service.price}</span>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => handleBookAppointment(studio.id, service.id)}
+                              >
+                                Agendar
+                              </Button>
+                            </div>
+                          ))}
+                          {studio.services.length > 3 && (
+                            <p className="text-xs text-gray-500">
+                              +{studio.services.length - 3} servicios más
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Botón para ver más */}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push(`/customer/studio/${studio.id}`)}
+                    >
+                      Ver estudio completo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Vista principal del dashboard
+  return (
+    <div className="container mx-auto p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">¡Hola, {profile.displayName || profile.email}! 👋</h1>
+          <p className="text-muted-foreground">Tu panel de cliente</p>
+        </div>
+        <Button onClick={logout} variant="outline">
+          Cerrar Sesión
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="cursor-pointer transition-transform hover:scale-105" onClick={() => setShowSearch(true)}>
+          <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
+              <Search className="h-4 w-4 text-blue-600" />
+            </div>
+            <CardTitle className="ml-2">Buscar Estudios</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Encuentra estudios de belleza y agenda servicios
+            </p>
+            <Button className="mt-3 w-full" variant="default">
+              Explorar Estudios
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer transition-transform hover:scale-105">
+          <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100">
+              <Calendar className="h-4 w-4 text-green-600" />
+            </div>
+            <CardTitle className="ml-2">Mis Citas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Ver y gestionar tus citas agendadas
+            </p>
+            <Link href="/customer/appointments" passHref>
+              <Button className="mt-3 w-full" variant="default">
+                Ver Mis Citas
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer transition-transform hover:scale-105">
+          <CardHeader className="flex flex-row items-center space-y-0 pb-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100">
+              <User className="h-4 w-4 text-purple-600" />
+            </div>
+            <CardTitle className="ml-2">Mi Perfil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Editar información personal y preferencias
+            </p>
+            <Link href="/customer/profile" passHref>
+              <Button className="mt-3 w-full" variant="default">
+                Editar Perfil
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sección de acceso rápido */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold mb-4">Acceso Rápido</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => setShowSearch(true)}>
+            <Search className="h-6 w-6" />
+            <span className="text-sm">Buscar</span>
+          </Button>
+          <Button variant="outline" className="h-20 flex flex-col gap-2" asChild>
+            <Link href="/customer/appointments">
+              <Calendar className="h-6 w-6" />
+              <span className="text-sm">Mis Citas</span>
+            </Link>
+          </Button>
+          <Button variant="outline" className="h-20 flex flex-col gap-2" asChild>
+            <Link href="/customer/profile">
+              <User className="h-6 w-6" />
+              <span className="text-sm">Perfil</span>
+            </Link>
+          </Button>
+          <Button variant="outline" className="h-20 flex flex-col gap-2" asChild>
+            <Link href="/customer/favorites">
+              <Star className="h-6 w-6" />
+              <span className="text-sm">Favoritos</span>
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

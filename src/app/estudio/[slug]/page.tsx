@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, Clock, MapPin, Phone, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getAllStudios, Studio, getStaff, getServices, getBookings, StaffMember, Service, Booking } from "@/lib/firebase/firestore";
+import { getAllStudios, getStaffForStudio, getServices, getBookings, Service, Booking } from "@/lib/firebase/firestore";
+import { Studio, UserProfile } from "@/lib/types";
 
 export default function StudioProfilePage({ params: { slug } }: { params: { slug: string } }) {
     const [studio, setStudio] = useState<Studio | null>(null);
-    const [staff, setStaff] = useState<StaffMember[]>([]);
+    const [staff, setStaff] = useState<(UserProfile & { roleId: string })[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
             if (currentStudio) {
                 setStudio(currentStudio);
                 const [staffData, servicesData, bookingsData] = await Promise.all([
-                    getStaff(currentStudio.id),
+                    getStaffForStudio(currentStudio.id),
                     getServices(currentStudio.id),
                     getBookings(currentStudio.id)
                 ]);
@@ -53,14 +54,14 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
         <div className="container mx-auto py-6 px-4 md:px-6">
             <header className="mb-6">
                 <div className="h-64 md:h-96 rounded-lg overflow-hidden relative">
-                    <Image src={studio.logoUrl || "https://placehold.co/1200x600.png"} alt={`Foto de ${studio.name}`} layout="fill" objectFit="cover" />
+                    <Image src={"https://placehold.co/1200x600.png"} alt={`Foto de ${studio.name}`} layout="fill" objectFit="cover" />
                 </div>
                 <div className="mt-[-60px] px-6">
                     <Card className="p-6 shadow-xl max-w-4xl mx-auto">
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div>
                                 <h1 className="text-3xl md:text-4xl font-bold">{studio.name}</h1>
-                                <p className="text-muted-foreground mt-1">{studio.location}</p>
+                                <p className="text-muted-foreground mt-1">Ubicación no especificada</p>
                                 {/* Rating and reviews are static for now */}
                                 <div className="flex items-center gap-2 mt-2">
                                     <div className="flex items-center">
@@ -98,7 +99,7 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
                                         </div>
                                     </CardHeader>
                                     <CardContent>
-                                        <p className="text-sm text-muted-foreground">{service.category}</p>
+                                        <p className="text-sm text-muted-foreground">{service.categoryId || 'General'}</p>
                                         <Button className="w-full mt-4" asChild>
                                             <Link href="/appointments">Añadir a la Reserva</Link>
                                         </Button>
@@ -110,13 +111,13 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
                     <TabsContent value="staff">
                          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                             {staff.map(member => (
-                                <Card key={member.name} className="text-center">
+                                <Card key={member.uid} className="text-center">
                                     <CardContent className="p-6">
                                         <Avatar className="h-24 w-24 mx-auto mb-4">
-                                            <AvatarImage src={member.avatar || `https://placehold.co/96x96.png`} />
-                                            <AvatarFallback>{member.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                                            <AvatarImage src={member.photoURL || `https://placehold.co/96x96.png`} />
+                                            <AvatarFallback>{(member.displayName || member.email).split(' ').map((n: string) => n[0]).join('')}</AvatarFallback>
                                         </Avatar>
-                                        <h3 className="font-semibold text-lg">{member.name}</h3>
+                                        <h3 className="font-semibold text-lg">{member.displayName || member.email}</h3>
                                         <p className="text-muted-foreground">{member.roleId}</p>
                                     </CardContent>
                                 </Card>
@@ -133,11 +134,11 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
                         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                             <div>
                                 <h3 className="text-xl font-semibold mb-4">Sobre Nosotros</h3>
-                                <p className="text-muted-foreground">{studio.description}</p>
+                                <p className="text-muted-foreground">Calificación: 0/5 (0 reseñas)</p>
                                  <h3 className="text-xl font-semibold mt-6 mb-4">Contacto</h3>
                                  <div className="flex items-center gap-3 text-muted-foreground">
                                      <Phone className="h-4 w-4" />
-                                     <span>{studio.phone}</span>
+                                     <span>Nivel de precios: 0/5</span>
                                  </div>
                             </div>
                             <div>
@@ -147,7 +148,7 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
                                 </div>
                                  <div className="flex items-center gap-3 mt-4 text-muted-foreground">
                                      <MapPin className="h-4 w-4" />
-                                     <span>{studio.location}</span>
+                                     <span>Ubicación no especificada</span>
                                  </div>
                             </div>
                         </div>

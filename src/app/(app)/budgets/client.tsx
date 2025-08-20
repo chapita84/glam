@@ -151,7 +151,7 @@ export default function BudgetsPageClient() {
               Crear Presupuesto
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-4xl">
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingBudget ? 'Editar Presupuesto' : 'Crear Nuevo Presupuesto'}

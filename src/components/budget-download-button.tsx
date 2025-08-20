@@ -6,7 +6,7 @@ import { pdf } from "@react-pdf/renderer";
 import { Button } from "@/components/ui/button";
 import { Loader2, Download } from "lucide-react";
 import { BudgetPDF } from "./budget-pdf";
-import type { BudgetItem } from "@/app/(app)/budgets/actions";
+import type { BudgetItem } from "@/lib/types";
 
 interface BudgetDownloadButtonProps {
     data: {

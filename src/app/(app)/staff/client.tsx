@@ -55,13 +55,19 @@ const createStaffUserFn = httpsCallable(functions, 'createStaffUser');
 type StaffMemberWithRole = UserProfile & { roleId: string };
 
 export default function StaffPageClient() {
-  const { currentStudio, profile, currentUser } = useAuth();
+  const { currentStudio, profile, currentUser, currentStudioRole } = useAuth();
   const [staff, setStaff] = useState<StaffMemberWithRole[]>([]);
   const [studioRoles, setStudioRoles] = useState<StudioRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // Verificar permisos
+  const isSuperAdmin = profile?.globalRole === 'superAdmin';
+  const canCreateStaff = isSuperAdmin || currentStudioRole?.permissions.includes('staff:create') || false;
+  const canUpdateStaff = isSuperAdmin || currentStudioRole?.permissions.includes('staff:update') || false;
+  const canDeleteStaff = isSuperAdmin || currentStudioRole?.permissions.includes('staff:delete') || false;
 
   const refreshData = async () => {
     if (!currentStudio) return;
@@ -121,10 +127,16 @@ export default function StaffPageClient() {
         password,
         displayName,
         roleId,
-        globalRole: 'owner',
+        globalRole: 'staff',
       });
-      await refreshData();
+      
       setIsDialogOpen(false);
+      
+      // Esperar un poco antes de refrescar para asegurar que los datos estén actualizados
+      setTimeout(async () => {
+        await refreshData();
+      }, 1000);
+      
       toast({
         title: '¡Éxito!',
         description: 'El nuevo miembro del personal ha sido creado y añadido.',
@@ -177,10 +189,12 @@ export default function StaffPageClient() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Gestión de Personal</h1>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Añadir Personal
-        </Button>
+        {canCreateStaff && (
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Añadir Personal
+          </Button>
+        )}
       </div>
       <Card>
         <CardHeader>

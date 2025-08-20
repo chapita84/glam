@@ -8,12 +8,13 @@ import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firesto
 import { type Studio } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 export default function SelectStudioPage() {
   console.log("DEBUG: Renderizando /select-studio page");
 
-  const { profile, memberships, setCurrentStudio, loading: authLoading } = useAuth();
+  const { profile, memberships, setCurrentStudio, loading: authLoading, logout } = useAuth();
   const [studios, setStudios] = useState<Studio[]>([]);
   const [isLoadingStudios, setIsLoadingStudios] = useState(true);
   const router = useRouter();
@@ -32,17 +33,34 @@ export default function SelectStudioPage() {
       try {
         if (profile.globalRole === 'superAdmin') {
           console.log("DEBUG: [fetchStudios] Super Admin, cargando TODOS los estudios.");
-          // For superadmin, we should read from the private 'studios' collection
           const studiosSnapshot = await getDocs(collection(db, 'studios'));
           studioDocs = studiosSnapshot.docs;
-        } else if (profile.globalRole === 'owner' || profile.globalRole === 'customer') {
-          console.log(`DEBUG: [fetchStudios] Cargando ${memberships.length} estudios desde membresías.`);
+        } else if (profile.globalRole === 'owner' || profile.globalRole === 'staff') {
+          console.log(`DEBUG: [fetchStudios] Cargando estudios para ${profile.globalRole}.`);
+          
+          // Para owners y staff, usar solo membresías ya que las reglas no permiten consultas where por ownerId
           if (memberships.length > 0) {
-            const studioIds = memberships.map(m => m.studioId);
-            const studiosQuery = query(collection(db, 'studios'), where('id', 'in', studioIds));
-            const studiosSnapshot = await getDocs(studiosQuery);
-            studioDocs = studiosSnapshot.docs;
+            console.log(`DEBUG: [fetchStudios] Cargando ${memberships.length} estudios desde membresías.`);
+            
+            // Usar getDoc directo para cada estudio (permitido por reglas)
+            const studioPromises = memberships.map(async (membership) => {
+              try {
+                const studioDoc = await getDoc(doc(db, 'studios', membership.studioId));
+                return studioDoc;
+              } catch (error) {
+                console.error(`Error cargando estudio ${membership.studioId}:`, error);
+                return null;
+              }
+            });
+            
+            const studioResults = await Promise.all(studioPromises);
+            studioDocs = studioResults.filter((doc): doc is any => doc !== null && doc.exists());
           }
+        } else if (profile.globalRole === 'customer') {
+          // Los customers no deberían estar aquí, pero por si acaso mostramos estudios públicos
+          console.log("DEBUG: [fetchStudios] Customer detectado, redirigiendo...");
+          router.push('/customer');
+          return;
         }
         
         const studiosData = studioDocs
@@ -51,6 +69,15 @@ export default function SelectStudioPage() {
         
         console.log(`DEBUG: [fetchStudios] Se encontraron y procesaron ${studiosData.length} estudios.`, studiosData);
         setStudios(studiosData);
+
+        // Auto-redireccionar si solo hay un estudio disponible
+        if (studiosData.length === 1) {
+          console.log("DEBUG: [fetchStudios] Solo un estudio disponible, auto-redirigiendo...");
+          const singleStudio = studiosData[0];
+          await setCurrentStudio(singleStudio);
+          router.push('/dashboard');
+          return;
+        }
 
       } catch (error) {
         console.error("DEBUG: [fetchStudios] Error cargando estudios:", error);
@@ -80,7 +107,12 @@ export default function SelectStudioPage() {
 
   return (
     <div className="container mx-auto flex h-screen flex-col items-center justify-center p-4">
-      <h1 className="mb-8 text-3xl font-bold">Selecciona un Estudio</h1>
+      <div className="mb-4 flex w-full max-w-4xl items-center justify-between">
+        <h1 className="text-3xl font-bold">Selecciona un Estudio</h1>
+        <Button onClick={logout} variant="outline">
+          Cerrar Sesión (Debug)
+        </Button>
+      </div>
       {studios.length > 0 ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {studios.map((studio) => (
@@ -100,7 +132,7 @@ export default function SelectStudioPage() {
         </div>
       ) : (
         <p>
-          {profile?.globalRole === 'owner' || profile?.globalRole === 'customer'
+          {profile?.globalRole === 'owner' || profile?.globalRole === 'staff'
             ? 'No estás asignado a ningún estudio.'
             : 'No hay estudios creados en la plataforma.'}
         </p>

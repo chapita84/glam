@@ -2,11 +2,10 @@
 'use client'
 
 import { AppointmentsCalendar } from "@/components/appointments-calendar";
-import { useStudioData } from "@/contexts/StudioDataContext";
 import { Loader2 } from "lucide-react";
 
 export default function AppointmentsPageClient() {
-    const { loading } = useStudioData();
+    const loading = false;
 
     if (loading) {
         return (

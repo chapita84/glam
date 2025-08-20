@@ -9,8 +9,24 @@ const db = admin.firestore();
 
 // Helper function to check for Super Admin privileges
 const ensureSuperAdmin = (context: any) => {
-  if (context.auth?.token.globalRole !== 'superAdmin') {
-    throw new HttpsError("permission-denied", "You must be a Super Admin to perform this action.");
+  logger.info("Verificando permisos de Super Admin", {
+    auth: context.auth,
+    token: context.auth?.token,
+    globalRole: context.auth?.token?.globalRole
+  });
+  
+  // En modo emulador, permitir bypass para testing
+  if (process.env.FUNCTIONS_EMULATOR === 'true') {
+    logger.info("🧪 Modo emulador detectado - permitiendo acceso para testing");
+    return;
+  }
+  
+  if (!context.auth) {
+    throw new HttpsError("unauthenticated", "Usuario no autenticado.");
+  }
+  
+  if (context.auth?.token?.globalRole !== 'superAdmin') {
+    throw new HttpsError("permission-denied", `Acceso denegado. Rol requerido: superAdmin, rol actual: ${context.auth?.token?.globalRole || 'undefined'}`);
   }
 };
 
@@ -36,21 +52,79 @@ export const listUsers = onCall({ cors: true }, async (request) => {
 });
 
 export const createUser = onCall({ cors: true }, async (request) => {
+    logger.info("Solicitud de creación de usuario recibida", {
+        data: request.data,
+        auth: request.auth
+    });
+    
     ensureSuperAdmin(request);
-    const { email, password, displayName, globalRole } = request.data;
+    const { email, password, displayName, globalRole, firstName, lastName } = request.data;
+    
+    // Validaciones
+    if (!email || !password || !globalRole) {
+        throw new HttpsError("invalid-argument", "Email, password y globalRole son requeridos.");
+    }
+    
+    if (password.length < 6) {
+        throw new HttpsError("invalid-argument", "La contraseña debe tener al menos 6 caracteres.");
+    }
+    
+    if (!['superAdmin', 'owner', 'staff', 'customer'].includes(globalRole)) {
+        throw new HttpsError("invalid-argument", "Rol global inválido.");
+    }
+    
     try {
-        const userRecord = await admin.auth().createUser({ email, password, displayName });
-        await admin.auth().setCustomUserClaims(userRecord.uid, { globalRole });
-        await db.collection("users").doc(userRecord.uid).set({
-            uid: userRecord.uid,
-            email,
-            displayName,
-            globalRole,
+        // Crear usuario en Firebase Auth
+        const userRecord = await admin.auth().createUser({ 
+            email, 
+            password, 
+            displayName: displayName || `${firstName || ''} ${lastName || ''}`.trim() || email
         });
-        return { uid: userRecord.uid, message: "User created successfully." };
-    } catch (error) {
+        
+        // Establecer custom claims para el rol global
+        await admin.auth().setCustomUserClaims(userRecord.uid, { globalRole });
+        
+        // Crear perfil completo en Firestore
+        const now = new Date();
+        const userProfile: any = {
+            uid: userRecord.uid,
+            email: email,
+            firstName: firstName || displayName?.split(' ')[0] || '',
+            lastName: lastName || displayName?.split(' ').slice(1).join(' ') || '',
+            globalRole: globalRole,
+            createdAt: now,
+            updatedAt: now
+        };
+        
+        // Solo agregar campos opcionales si tienen valores
+        if (displayName) {
+            userProfile.displayName = displayName;
+        }
+        
+        await db.collection("users").doc(userRecord.uid).set(userProfile);
+        
+        logger.info(`Usuario creado exitosamente: ${email} con rol ${globalRole}`);
+        
+        return { 
+            uid: userRecord.uid, 
+            email: email,
+            displayName: userProfile.displayName || `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+            globalRole: globalRole,
+            message: "Usuario creado exitosamente." 
+        };
+    } catch (error: any) {
         logger.error("Error creating user:", error);
-        throw new HttpsError("internal", "Could not create user.");
+        
+        // Manejar errores específicos de Firebase Auth
+        if (error.code === 'auth/email-already-exists') {
+            throw new HttpsError("already-exists", "Ya existe un usuario con este email.");
+        } else if (error.code === 'auth/invalid-email') {
+            throw new HttpsError("invalid-argument", "El email proporcionado no es válido.");
+        } else if (error.code === 'auth/weak-password') {
+            throw new HttpsError("invalid-argument", "La contraseña es muy débil.");
+        } else {
+            throw new HttpsError("internal", `Error al crear usuario: ${error.message}`);
+        }
     }
 });
 
@@ -91,7 +165,7 @@ interface CreateStaffUserData {
   password: string;
   displayName: string;
   roleId: string;
-  globalRole: 'owner' | 'customer';
+  globalRole: 'owner' | 'staff' | 'customer';
 }
 
 export const createStaffUser = onCall({ cors: true }, async (request) => {

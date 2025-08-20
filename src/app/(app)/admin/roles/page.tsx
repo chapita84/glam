@@ -13,13 +13,13 @@ import { getGlobalRoles, addOrUpdateGlobalRole } from "@/lib/firebase/firestore"
 import { PermissionsTree } from "@/components/permissions-tree";
 import type { Role } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { ALL_PERMISSIONS } from "@/lib/permissions";
+import { ALL_PERMISSIONS, getGlobalRolePermissions } from "@/lib/permissions";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function GlobalRolesPage() {
-  const { currentUser } = useAuth();
+  const { currentUser, profile } = useAuth();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -30,7 +30,50 @@ export default function GlobalRolesPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const globalRoles = await getGlobalRoles();
+    let globalRoles = await getGlobalRoles();
+    
+    // Si no hay roles, crear los roles por defecto
+    if (globalRoles.length === 0) {
+      console.log('No se encontraron roles globales, creando roles por defecto...');
+      const defaultRoles = [
+        {
+          id: 'superAdmin',
+          name: 'Super Administrador',
+          description: 'Acceso completo a toda la plataforma',
+          permissions: getGlobalRolePermissions('superAdmin')
+        },
+        {
+          id: 'owner',
+          name: 'Propietario de Estudio',
+          description: 'Propietario que puede gestionar uno o más estudios',
+          permissions: getGlobalRolePermissions('owner')
+        },
+        {
+          id: 'staff',
+          name: 'Personal de Estudio',
+          description: 'Empleado que trabaja en un estudio específico',
+          permissions: getGlobalRolePermissions('staff')
+        },
+        {
+          id: 'customer',
+          name: 'Cliente',
+          description: 'Usuario final que puede reservar servicios',
+          permissions: getGlobalRolePermissions('customer')
+        }
+      ];
+      
+      try {
+        for (const role of defaultRoles) {
+          await addOrUpdateGlobalRole(role);
+        }
+        globalRoles = await getGlobalRoles();
+        toast({ title: "Éxito", description: "Roles globales inicializados correctamente." });
+      } catch (error) {
+        console.error('Error creando roles por defecto:', error);
+        toast({ title: "Error", description: "No se pudieron crear los roles por defecto.", variant: "destructive" });
+      }
+    }
+    
     setRoles(globalRoles);
     if (globalRoles.length > 0 && !selectedRole) {
         setSelectedRole(globalRoles[0]);
@@ -60,7 +103,7 @@ export default function GlobalRolesPage() {
       id: selectedRole.id,
       name: roleDetails.name,
       description: roleDetails.description ?? '',
-      permissions: permissions,
+      permissions: Array.from(permissions),
     };
 
     try {
@@ -74,7 +117,7 @@ export default function GlobalRolesPage() {
     }
   };
   
-  if (currentUser?.globalRole !== 'superAdmin') {
+  if (profile?.globalRole !== 'superAdmin') {
     return <Card><CardHeader><CardTitle>Acceso Denegado</CardTitle><CardDescription>No tienes permiso para ver esta página.</CardDescription></CardHeader></Card>;
   }
   

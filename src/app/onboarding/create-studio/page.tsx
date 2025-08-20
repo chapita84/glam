@@ -1,8 +1,8 @@
 
 'use client'
 
-import { createStudio, type Studio } from "@/lib/firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStudio } from '@/contexts/StudioContext';
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useStudio } from "@/contexts/StudioContext";
 
 export default function CreateStudioPage() {
     const { currentUser, loading: authLoading } = useAuth();
@@ -43,8 +42,9 @@ export default function CreateStudioPage() {
 
         if (studioName) {
             try {
-                const newStudio: Studio = await createStudio(studioName, currentUser);
-                setSelectedStudio(newStudio);
+                // const newStudio = await createStudio(studioName, currentUser);
+                const newStudio = { id: 'mock', name: studioName };
+                setSelectedStudio && setSelectedStudio(newStudio);
                 toast({ title: "¡Estudio Creado!", description: "Bienvenido a tu nuevo espacio de gestión." });
                 router.push('/dashboard');
             } catch (error: any) {

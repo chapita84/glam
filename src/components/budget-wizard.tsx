@@ -1,8 +1,7 @@
 
 "use client"
 
-import { useActionState, useState, useEffect, useMemo } from "react"
-import { useFormStatus } from "react-dom"
+import { useState, useEffect, useMemo } from "react"
 import { handleAIGeneration, handleSaveBudget } from "@/app/(app)/budgets/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -58,10 +57,42 @@ export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardPr
   const [status, setStatus] = useState<Budget['status']> (initialBudget?.status || 'draft');
 
   const { toast } = useToast();
-  const [aiState, aiFormAction] = useActionState(handleAIGeneration, { message: "" });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
   
-  const saveBudgetWithStudioId = handleSaveBudget.bind(null, studioId);
-  const [budgetState, budgetFormAction] = useActionState(saveBudgetWithStudioId, { message: "" });
+  const handleAIClick = async (formData: FormData) => {
+    setAiLoading(true);
+    try {
+      const result = await handleAIGeneration({ message: "" }, formData);
+      if (result.message) {
+        toast({ title: "IA", description: result.message });
+        if (result.data) {
+          setItems(result.data);
+        }
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error generando con IA", variant: "destructive" });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleSaveClick = async (formData: FormData) => {
+    setSaveLoading(true);
+    try {
+      const result = await handleSaveBudget(studioId, { message: "" }, formData);
+      if (result.message) {
+        toast({ title: "Presupuesto", description: result.message });
+        if (result.message.includes("guardado")) {
+          onSave?.();
+        }
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Error guardando presupuesto", variant: "destructive" });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function loadServices() {
@@ -73,32 +104,13 @@ export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardPr
     loadServices();
   }, [studioId]);
 
-
-  useEffect(() => {
-    if (aiState.message === 'success' && aiState.data) {
-        setItems(aiState.data);
-        toast({ title: "Sugerencias generadas", description: "Se han añadido servicios sugeridos por la IA." });
-    } else if (aiState.message && aiState.message !== 'success') {
-        toast({ title: "Error de IA", description: aiState.message, variant: 'destructive' });
-    }
-  }, [aiState, toast]);
-
-  useEffect(() => {
-    if (budgetState.message === 'success') {
-        toast({ title: "¡Éxito!", description: "El presupuesto se ha guardado correctamente." });
-        onSave();
-    } else if (budgetState.message && budgetState.message !== 'success') {
-        toast({ title: "Error al guardar", description: budgetState.message, variant: 'destructive' });
-    }
-  }, [budgetState, onSave, toast]);
-
   const { servicesSubtotal, totalUSD, totalARS, budgetPDFData, pdfFileName } = useMemo(() => {
     const servicesSubtotal = items.reduce((total, item) => total + ((item.quantity || 0) * (item.unitCost.amount || 0)), 0);
     const totalUSD = servicesSubtotal + (logisticsCost || 0);
     const totalARS = totalUSD * (usdRate || 0);
     const budgetPDFData = {
       eventType: eventDetails.eventType, eventDate: eventDetails.eventDate, eventLocation: eventDetails.eventLocation,
-      services: items.map(i => ({ name: i.description, quantity: i.quantity, price: i.unitCost.amount })),
+      services: items, // Pass BudgetItem[] directly instead of mapping
       servicesTotal: servicesSubtotal, logisticsCost, totalUSD, totalARS, usdRate,
     }
     const pdfFileName = `Presupuesto-${eventDetails.eventType}-${eventDetails.clientName}.pdf`;
@@ -145,13 +157,11 @@ export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardPr
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
   
   const AIGenerateButton = () => {
-    const { pending } = useFormStatus();
-    return <Button type="submit" disabled={pending}>{pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Generar Sugerencias</Button>
+    return <Button type="submit" disabled={aiLoading}>{aiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />} Generar Sugerencias</Button>
   }
 
   const SaveBudgetButton = ({ children }: { children: React.ReactNode }) => {
-    const { pending } = useFormStatus();
-    return <Button type="submit" className="w-full" disabled={pending || !studioId}>{pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {children}</Button>
+    return <Button type="submit" className="w-full" disabled={saveLoading || !studioId}>{saveLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {children}</Button>
   }
   
   return (
@@ -175,7 +185,7 @@ export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardPr
 
         {currentStep === 1 && (
           <div className="space-y-6">
-             <form action={aiFormAction} className="space-y-4 p-4 border rounded-lg">
+             <form onSubmit={(e) => { e.preventDefault(); const formData = new FormData(e.currentTarget); handleAIClick(formData); }} className="space-y-4 p-4 border rounded-lg">
                 <Textarea id="eventTypeDescription" name="eventTypeDescription" placeholder="Describa el evento para recibir sugerencias de la IA..." />
                 <AIGenerateButton />
              </form>
@@ -230,7 +240,7 @@ export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardPr
                 </div>
                 <div className="grid md:grid-cols-2 gap-4">
                     <BudgetDownloadButton data={budgetPDFData} fileName={pdfFileName} />
-                    <form action={budgetFormAction}>
+                    <form onSubmit={(e) => { e.preventDefault(); const formData = new FormData(e.currentTarget); handleSaveClick(formData); }}>
                         <input type="hidden" name="id" value={initialBudget?.id || ''} />
                         <input type="hidden" name="budgetName" value={`${eventDetails.eventType} - ${eventDetails.clientName}`} />
                         <input type="hidden" name="clientName" value={eventDetails.clientName} />
@@ -241,7 +251,6 @@ export function BudgetWizard({ studioId, initialBudget, onSave }: BudgetWizardPr
                         <SaveBudgetButton>{initialBudget ? "Guardar Cambios" : "Guardar Presupuesto"}</SaveBudgetButton>
                     </form>
                 </div>
-                 {budgetState.message && budgetState.message !== 'success' && (<Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{budgetState.message}</AlertDescription></Alert>)}
             </div>
         )}
       </div>

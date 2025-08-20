@@ -1,3 +1,8 @@
+
+// Cargar variables de entorno desde .env.local si existe
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
 import * as admin from 'firebase-admin';
 
 console.log("--- Firebase Admin SDK Initialization ---");

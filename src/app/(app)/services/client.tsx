@@ -55,9 +55,10 @@ export default function ServicesPageClient() {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  const canCreate = currentStudioRole?.permissions.includes('services:create') ?? false;
-  const canUpdate = currentStudioRole?.permissions.includes('services:update') ?? false;
-  const canDelete = currentStudioRole?.permissions.includes('services:delete') ?? false;
+  const isSuperAdmin = profile?.globalRole === 'superAdmin';
+  const canCreate = isSuperAdmin || (currentStudioRole?.permissions.includes('services:create') ?? false);
+  const canUpdate = isSuperAdmin || (currentStudioRole?.permissions.includes('services:update') ?? false);
+  const canDelete = isSuperAdmin || (currentStudioRole?.permissions.includes('services:delete') ?? false);
 
   const refreshData = async () => {
     if (!currentStudio) return;

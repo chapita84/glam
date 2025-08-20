@@ -7,18 +7,48 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { useStudioData } from "@/contexts/StudioDataContext"
-import { type StudioConfig, updateStudioConfig } from "@/lib/firebase/firestore"
+import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/hooks/use-toast"
+import { updateStudioConfig, getStudioConfig } from "@/lib/firebase/firestore"
 import { Loader2 } from "lucide-react"
 
 const dayNames: { [key: number]: string } = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
 
 export default function SettingsPage() {
-  const { studioId, config: initialConfig, refreshData, loading: dataLoading } = useStudioData();
-  const [config, setConfig] = useState<StudioConfig | null>(initialConfig);
+  const { currentStudio } = useAuth();
+  const [config, setConfig] = useState<any>(null);
+  const [initialConfig, setInitialConfig] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  console.log('🏪 SettingsPage render - currentStudio:', currentStudio);
+  console.log('🏪 SettingsPage render - config:', config);
+  console.log('🏪 SettingsPage render - loading:', loading);
+
+  // Load studio config when component mounts or studio changes
+  useEffect(() => {
+    const loadConfig = async () => {
+      if (!currentStudio?.id) {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const studioConfig = await getStudioConfig(currentStudio.id);
+        setInitialConfig(studioConfig);
+        setConfig(studioConfig);
+      } catch (error) {
+        console.error('Error loading studio config:', error);
+        toast({ title: "Error", description: "No se pudo cargar la configuración.", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, [currentStudio?.id, toast]);
 
   useEffect(() => {
     if (initialConfig) {
@@ -38,7 +68,7 @@ export default function SettingsPage() {
 
   const handleTimeChange = (day: number, field: 'startTime' | 'endTime', value: string) => {
     if (config) {
-        const newWorkingHours = config.workingHours.map(wh => 
+        const newWorkingHours = config.workingHours.map((wh: any) => 
             wh.dayOfWeek === day ? { ...wh, [field]: value } : wh
         );
         setConfig({ ...config, workingHours: newWorkingHours });
@@ -47,7 +77,7 @@ export default function SettingsPage() {
 
   const handleEnableToggle = (day: number, enabled: boolean) => {
     if (config) {
-        const newWorkingHours = config.workingHours.map(wh => 
+        const newWorkingHours = config.workingHours.map((wh: any) => 
             wh.dayOfWeek === day ? { ...wh, enabled } : wh
         );
         setConfig({ ...config, workingHours: newWorkingHours });
@@ -55,20 +85,41 @@ export default function SettingsPage() {
   }
 
   const handleSave = async () => {
-    if (!studioId || !config) return;
+    console.log('🔧 handleSave called');
+    console.log('🔧 currentStudio:', currentStudio);
+    console.log('🔧 config:', config);
+    
+    if (!currentStudio?.id || !config) {
+      console.log('🔧 Missing studio ID or config, returning early');
+      return;
+    }
+    
     setIsSaving(true);
+    console.log('🔧 Starting save process...');
+    
     try {
-        await updateStudioConfig(studioId, config);
-        await refreshData();
+        console.log('🔧 Calling updateStudioConfig...');
+        await updateStudioConfig(currentStudio.id, config);
+        console.log('🔧 updateStudioConfig completed');
+        
+        console.log('🔧 Reloading config...');
+        const updatedConfig = await getStudioConfig(currentStudio.id);
+        setConfig(updatedConfig);
+        setInitialConfig(updatedConfig);
+        console.log('🔧 Config reloaded');
+        
         toast({ title: "Configuración Guardada", description: "Tus ajustes se han actualizado." });
+        console.log('🔧 Save process completed successfully');
     } catch (error) {
+        console.error('🔧 Error saving config:', error);
         toast({ title: "Error", description: "No se pudo guardar la configuración.", variant: "destructive" });
     } finally {
         setIsSaving(false);
+        console.log('🔧 Save process finished');
     }
   }
 
-  if (dataLoading) {
+  if (loading) {
       return <div>Cargando configuración...</div>;
   }
   
@@ -82,7 +133,7 @@ export default function SettingsPage() {
           <CardDescription>Define los días y horas en que tu estudio está abierto para recibir citas.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {config?.workingHours.sort((a,b) => a.dayOfWeek - b.dayOfWeek).map(wh => (
+          {config?.workingHours.sort((a: any, b: any) => a.dayOfWeek - b.dayOfWeek).map((wh: any) => (
             <div key={wh.dayOfWeek} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4">
               <div className="w-full md:w-1/4 font-semibold">{dayNames[wh.dayOfWeek]}</div>
               <div className="flex-grow flex items-center gap-4">

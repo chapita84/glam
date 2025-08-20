@@ -11,17 +11,25 @@ import Link from "next/link"
 
 type SearchResultCardProps = {
     name: string;
-    location: string;
-    rating: number;
-    reviewCount: number;
-    services: string[];
-    imageUrl: string;
-    categories: string[];
-    priceTier: number;
+    location?: string;
+    rating?: number;
+    reviewCount?: number;
+    services?: string[];
+    imageUrl?: string;
+    categories?: string[];
+    priceTier?: number;
     slug: string; // Añadido para el enlace
 }
 
-export function SearchResultCard({ name, location, rating, reviewCount, services, imageUrl, slug }: SearchResultCardProps) {
+export function SearchResultCard({ 
+  name, 
+  location = "Ubicación no especificada", 
+  rating = 0, 
+  reviewCount = 0, 
+  services = [], 
+  imageUrl = "/placeholder-studio.jpg", 
+  slug 
+}: SearchResultCardProps) {
   return (
     <Card className="overflow-hidden">
       <div className="grid md:grid-cols-3">

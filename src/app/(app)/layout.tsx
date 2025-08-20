@@ -25,6 +25,7 @@ const allNavItems = [
     { href: '/settings', label: 'Configuración', icon: Settings, permission: 'settings:manage-studio' },
     { href: '/admin/users', label: 'Usuarios', icon: UserCog, permission: 'admin:manage-users' },
     { href: '/admin/roles', label: 'Roles Globales', icon: ShieldCheck, permission: 'admin:manage-roles' },
+    { href: '/admin/studio-management', label: 'Gestión de Estudios', icon: Landmark, permission: 'admin:manage-studios' },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -42,17 +43,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
     const accessibleNavItems = useMemo(() => {
         console.log("DEBUG: [useMemo accessibleNavItems] Recalculando menú...");
+        console.log("DEBUG: [useMemo accessibleNavItems] Profile:", profile);
+        console.log("DEBUG: [useMemo accessibleNavItems] CurrentStudioRole:", currentStudioRole);
+        
         if (!profile) {
             console.log("DEBUG: [useMemo accessibleNavItems] No hay perfil, menú vacío.");
             return [];
         }
 
         if (profile.globalRole === 'superAdmin') {
-            console.log("DEBUG: [useMemo accessibleNavItems] Es Super Admin, mostrando items de admin.");
-            const allPermissions = new Set(getAllPermissionIds(ALL_PERMISSIONS));
-            allPermissions.add('admin:manage-users');
-            allPermissions.add('admin:manage-roles');
-            return allNavItems.filter(item => allPermissions.has(item.permission));
+            console.log("DEBUG: [useMemo accessibleNavItems] Es Super Admin, mostrando todos los items del menú.");
+            return allNavItems; // SuperAdmin puede ver todo
         }
 
         if (currentStudioRole?.permissions) {
@@ -64,6 +65,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         }
         
         console.log("DEBUG: [useMemo accessibleNavItems] No se cumplió ninguna condición, menú vacío.");
+        console.log("DEBUG: [useMemo accessibleNavItems] currentStudioRole existe?", !!currentStudioRole);
+        console.log("DEBUG: [useMemo accessibleNavItems] currentStudioRole.permissions existe?", !!currentStudioRole?.permissions);
         return [];
     }, [profile, currentStudioRole]);
 

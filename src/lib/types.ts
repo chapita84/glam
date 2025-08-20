@@ -1,3 +1,16 @@
+// --- Public Studio for Search ---
+export interface PublicStudio {
+  id: string;
+  name: string;
+  slug: string;
+  location: string;
+  rating: number;
+  reviewCount: number;
+  services: string[];
+  imageUrl: string;
+  categories: string[];
+  priceTier: number;
+}
 
 import { z } from "zod";
 
@@ -18,8 +31,22 @@ export interface Category {
 }
 
 // --- User, Roles & Studios (New Data Model) ---
-export type GlobalRole = 'superAdmin' | 'owner' | 'customer';
+export type GlobalRole = 'superAdmin' | 'owner' | 'staff' | 'customer';
 
+export interface User {
+  uid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  birthDate?: Date;
+  photoURL?: string;
+  globalRole: GlobalRole;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Backward compatibility - deprecated, use User instead
 export interface UserProfile {
   uid: string;
   email: string;
@@ -35,6 +62,23 @@ export interface StudioRole {
   permissions: string[];
 }
 
+// Generic Role type for admin roles management
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
+export interface Permission {
+  id: string;
+  name: string;
+  label: string;
+  description?: string;
+  category?: string;
+  children?: Permission[];
+}
+
 export interface StudioMember {
   userId: string;
   studioId: string;
@@ -46,6 +90,8 @@ export interface Studio {
   name: string;
   slug: string;
   ownerId: string;
+  address?: string;
+  description?: string;
 }
 
 // --- Appointments, TimeBlocks & Staff ---
@@ -57,9 +103,11 @@ export interface Appointment {
   staffId: string;
   clientId: string;
   clientName?: string;
+  clientEmail?: string;
   serviceName?: string;
   staffName?: string;
   notes?: string;
+  status?: 'pending' | 'confirmed' | 'cancelled' | 'completed';
 }
 
 export interface TimeBlock {

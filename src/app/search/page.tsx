@@ -6,11 +6,15 @@ import { getAllStudios } from '@/lib/firebase/firestore';
 import { type Studio } from '@/lib/types';
 import { SearchResultCard } from '@/components/search-result-card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import Link from 'next/link';
 
 export default function SearchPage() {
   console.log("DEBUG: Renderizando /search page");
 
+  const { currentUser, logout } = useAuth();
   const [allStudios, setAllStudios] = useState<Studio[]>([]);
   const [filteredStudios, setFilteredStudios] = useState<Studio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +54,42 @@ export default function SearchPage() {
 
   return (
     <div className="container mx-auto max-w-4xl py-8">
-      <h1 className="mb-6 text-3xl font-bold">Buscar Estudios</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Buscar Estudios</h1>
+        
+        {/* Botones de autenticación */}
+        <div className="flex gap-2">
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {currentUser.email}
+              </span>
+              <Button onClick={logout} variant="outline" size="sm">
+                Cerrar Sesión
+              </Button>
+              <Link href="/" passHref>
+                <Button variant="default" size="sm">
+                  Panel
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Link href="/login" passHref>
+                <Button variant="outline" size="sm">
+                  Iniciar Sesión
+                </Button>
+              </Link>
+              <Link href="/register" passHref>
+                <Button variant="default" size="sm">
+                  Registrarse
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+      
       <div className="mb-8">
         <Input
           type="text"
@@ -69,7 +108,7 @@ export default function SearchPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredStudios.length > 0 ? (
             filteredStudios.map((studio) => (
-              <SearchResultCard key={studio.id} studio={studio} />
+              <SearchResultCard key={studio.id} {...studio} />
             ))
           ) : (
             <p className="col-span-full text-center text-muted-foreground">

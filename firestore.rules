@@ -2,14 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regla 1: Super Admin
+    // Regla 1: Super Admin - acceso total
     match /{document=**} {
       allow read, write: if request.auth.token.superadmin == true;
     }
 
-    // Regla 2: Datos Públicos de Estudios (CORREGIDA Y FINAL)
-    // Cualquiera puede leer la lista de estudios y documentos individuales.
-    match /studios_public/{studioId} {
+    // Regla 2: Datos Públicos de Estudios
+    match /studios/{studioId} {
       allow get, list: if true;
     }
 
@@ -18,14 +17,69 @@ service cloud.firestore {
       allow read, write: if request.auth.uid == userId;
     }
     
-    // Regla 4: Membresías de Estudio
+    // Regla 4: Membresías de Estudio - usuarios pueden leer membresías de estudios donde son miembros
     match /studio_members/{membershipId} {
-      allow read: if request.auth.uid != null && request.auth.uid == resource.data.userId;
+      allow read: if request.auth.uid != null && 
+        (request.auth.uid == resource.data.userId || 
+         exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + resource.data.studioId)));
+      allow list: if request.auth.uid != null;
     }
 
-    // Regla 5: Datos Privados del Estudio
-    match /studios/{studioId}/{document=**} {
-      allow read, write: if exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
+    // Regla 5: Servicios del Estudio (acceso público para lectura)
+    match /studios/{studioId}/services/{serviceId} {
+      allow read: if true;
+      allow list: if true;
+    }
+
+    // Regla 6: Staff/Personal del Estudio - miembros pueden leer
+    match /studios/{studioId}/staff/{staffId} {
+      allow read, write: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
+    }
+
+    // Regla 7: Roles del Estudio - miembros pueden leer
+    match /studios/{studioId}/roles/{roleId} {
+      allow read: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
+    }
+
+    // Regla 8: Configuración del Estudio - miembros pueden leer/escribir
+    match /studios/{studioId}/config/{configId} {
+      allow read, write: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
+    }
+
+    // Regla 9: Citas del Estudio
+    match /studios/{studioId}/appointments/{appointmentId} {
+      // Miembros del estudio pueden leer/escribir todas las citas
+      allow read, write: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
+      
+      // Clientes pueden leer/modificar solo sus propias citas
+      allow read, update, delete: if request.auth.uid != null && 
+        resource.data.clientId == request.auth.uid;
+      
+      // Clientes pueden crear citas para sí mismos
+      allow create: if request.auth.uid != null && 
+        request.resource.data.clientId == request.auth.uid;
+    }
+
+    // Regla 10: Bloques de Tiempo - miembros pueden leer/escribir
+    match /studios/{studioId}/time_blocks/{blockId} {
+      allow read, write: if request.auth.uid != null && 
+        exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
+    }
+
+    // Regla 11: Otras subcolecciones del estudio - miembros pueden acceder
+    match /studios/{studioId}/{collection}/{document} {
+      allow read, write: if request.auth.uid != null && 
+        collection != 'appointments' && 
+        collection != 'services' && 
+        collection != 'staff' && 
+        collection != 'roles' && 
+        collection != 'config' && 
+        collection != 'time_blocks' &&
+        exists(/databases/$(database)/documents/studio_members/$(request.auth.uid + '_' + studioId));
     }
   }
 }

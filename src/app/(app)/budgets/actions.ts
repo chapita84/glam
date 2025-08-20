@@ -35,8 +35,16 @@ export async function handleAIGeneration(prevState: AIFormState, formData: FormD
     }
 
     try {
-        const result = await generateBudget(eventTypeDescription);
-        const budgetItems = result.items as BudgetItem[];
+        const result = await generateBudget({ eventTypeDescription });
+        const budgetItems = result.suggestedServices.map(service => ({
+            description: service.name,
+            category: 'Service',
+            quantity: service.quantity,
+            unitCost: {
+                amount: service.price,
+                currency: 'USD' as const
+            }
+        })) as BudgetItem[];
         return { message: "success", data: budgetItems };
     } catch (error: any) {
         console.error("Genkit AI flow failed:", error);
