@@ -2,7 +2,7 @@
 'use client';
 
 import {
-    CircleUser, Calendar, Settings, Users, Briefcase, LayoutDashboard, LogOut, UserCog, ShieldCheck, FileText, CreditCard, Search, Landmark
+    CircleUser, LogOut, Landmark
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,21 +12,8 @@ import { Sidebar, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, S
 import { Toaster } from '@/components/ui/toaster';
 import { ReactNode, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
-import { getAllPermissionIds, ALL_PERMISSIONS } from '@/lib/permissions';
-
-const allNavItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'dashboard:view' },
-    { href: '/appointments', label: 'Turnos', icon: Calendar, permission: 'appointments:view' },
-    { href: '/services', label: 'Servicios', icon: Briefcase, permission: 'services:view' },
-    { href: '/staff', label: 'Staff', icon: Users, permission: 'staff:view' },
-    { href: '/budgets', label: 'Presupuestos', icon: FileText, permission: 'budgets:view' },
-    { href: '/billing', label: 'Facturación', icon: CreditCard, permission: 'settings:manage-billing' },
-    { href: '/roles', label: 'Roles de Estudio', icon: ShieldCheck, permission: 'settings:manage-roles' },
-    { href: '/settings', label: 'Configuración', icon: Settings, permission: 'settings:manage-studio' },
-    { href: '/admin/users', label: 'Usuarios', icon: UserCog, permission: 'admin:manage-users' },
-    { href: '/admin/roles', label: 'Roles Globales', icon: ShieldCheck, permission: 'admin:manage-roles' },
-    { href: '/admin/studio-management', label: 'Gestión de Estudios', icon: Landmark, permission: 'admin:manage-studios' },
-];
+import { DynamicMenu } from '@/components/dynamic-menu';
+import { MAIN_MENU, CUSTOMER_MENU } from '@/lib/menu-config';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
     console.log("DEBUG: Renderizando AppLayout");
@@ -41,34 +28,18 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     } = useAuth();
     const router = useRouter();
 
-    const accessibleNavItems = useMemo(() => {
-        console.log("DEBUG: [useMemo accessibleNavItems] Recalculando menú...");
-        console.log("DEBUG: [useMemo accessibleNavItems] Profile:", profile);
-        console.log("DEBUG: [useMemo accessibleNavItems] CurrentStudioRole:", currentStudioRole);
+    // Determine which menu to use based on user role
+    const menuItems = useMemo(() => {
+        if (!profile) return [];
         
-        if (!profile) {
-            console.log("DEBUG: [useMemo accessibleNavItems] No hay perfil, menú vacío.");
-            return [];
-        }
-
-        if (profile.globalRole === 'superAdmin') {
-            console.log("DEBUG: [useMemo accessibleNavItems] Es Super Admin, mostrando todos los items del menú.");
-            return allNavItems; // SuperAdmin puede ver todo
-        }
-
-        if (currentStudioRole?.permissions) {
-             const userPermissions = new Set(currentStudioRole.permissions);
-             console.log("DEBUG: [useMemo accessibleNavItems] Permisos del rol de estudio:", userPermissions);
-             const items = allNavItems.filter(item => userPermissions.has(item.permission));
-             console.log("DEBUG: [useMemo accessibleNavItems] Items de menú accesibles:", items);
-             return items;
+        // Customer portal gets different menu
+        if (profile.globalRole === 'customer') {
+            return CUSTOMER_MENU;
         }
         
-        console.log("DEBUG: [useMemo accessibleNavItems] No se cumplió ninguna condición, menú vacío.");
-        console.log("DEBUG: [useMemo accessibleNavItems] currentStudioRole existe?", !!currentStudioRole);
-        console.log("DEBUG: [useMemo accessibleNavItems] currentStudioRole.permissions existe?", !!currentStudioRole?.permissions);
-        return [];
-    }, [profile, currentStudioRole]);
+        // All other roles get main menu (filtered by permissions)
+        return MAIN_MENU;
+    }, [profile]);
 
     if (authLoading) {
         return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-12 w-12 animate-spin" /></div>;
@@ -85,18 +56,53 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                         {currentStudio ? <p className="text-sm text-muted-foreground">{currentStudio.name}</p> : <p className="text-sm text-muted-foreground">Menú Principal</p>}
                     </SidebarHeader>
                     <SidebarContent>
-                        <SidebarMenu>
-                            {accessibleNavItems.map((item) => (
-                                <SidebarMenuItem key={item.href}>
-                                    <SidebarMenuButton 
-                                        href={item.href} 
-                                        label={item.label} 
-                                        icon={item.icon} 
-                                        isActive={pathname.startsWith(item.href)} 
-                                    />
-                                </SidebarMenuItem>
-                            ))}
-                        </SidebarMenu>
+                        <DynamicMenu items={menuItems}>
+                            {(visibleItems) => (
+                                <SidebarMenu>
+                                    {visibleItems.map((item) => {
+                                        // Handle dividers
+                                        if (item.divider) {
+                                            return <div key={item.id} className="border-t border-sidebar-border my-2" />;
+                                        }
+                                        
+                                        // Handle sections with children
+                                        if (item.children) {
+                                            return (
+                                                <div key={item.id} className="mt-4">
+                                                    {item.label && (
+                                                        <div className="px-3 py-2 text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
+                                                            {item.label}
+                                                        </div>
+                                                    )}
+                                                    {item.children.map((child) => (
+                                                        <SidebarMenuItem key={child.id}>
+                                                            <SidebarMenuButton 
+                                                                href={child.href} 
+                                                                label={child.label || ''} 
+                                                                icon={child.icon} 
+                                                                isActive={child.href ? pathname.startsWith(child.href) : false} 
+                                                            />
+                                                        </SidebarMenuItem>
+                                                    ))}
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        // Handle regular menu items
+                                        return (
+                                            <SidebarMenuItem key={item.id}>
+                                                <SidebarMenuButton 
+                                                    href={item.href} 
+                                                    label={item.label || ''} 
+                                                    icon={item.icon} 
+                                                    isActive={item.href ? pathname.startsWith(item.href) : false} 
+                                                />
+                                            </SidebarMenuItem>
+                                        );
+                                    })}
+                                </SidebarMenu>
+                            )}
+                        </DynamicMenu>
                     </SidebarContent>
                     <SidebarFooter>
                         <DropdownMenu>

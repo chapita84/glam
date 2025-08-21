@@ -101,3 +101,48 @@ export const checkPermission = (
   const globalPermissions = getGlobalRolePermissions(user.globalRole);
   return globalPermissions.includes(permission);
 };
+
+/**
+ * Simple can function for use in components
+ * @param user - The user profile  
+ * @param studioRole - The user's role in the current studio
+ * @param permission - The permission to check
+ * @returns boolean indicating if the user has the permission
+ */
+export function can(
+  user: UserProfile | null,
+  studioRole: StudioRole | null, 
+  permission: string
+): boolean {
+  return checkPermission(user, permission, studioRole);
+}
+
+/**
+ * Checks if a user has any of the specified permissions
+ * @param user - The user profile
+ * @param studioRole - The user's role in the current studio  
+ * @param permissions - Array of permissions to check
+ * @returns boolean indicating if the user has at least one permission
+ */
+export function canAny(
+  user: UserProfile | null,
+  studioRole: StudioRole | null,
+  permissions: string[]
+): boolean {
+  return permissions.some(permission => can(user, studioRole, permission));
+}
+
+/**
+ * Checks if a user has all of the specified permissions
+ * @param user - The user profile
+ * @param studioRole - The user's role in the current studio
+ * @param permissions - Array of permissions to check  
+ * @returns boolean indicating if the user has all permissions
+ */
+export function canAll(
+  user: UserProfile | null,
+  studioRole: StudioRole | null,
+  permissions: string[]
+): boolean {
+  return permissions.every(permission => can(user, studioRole, permission));
+}

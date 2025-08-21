@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { BudgetWizard } from '@/components/budget-wizard';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,27 +50,36 @@ const statusMap: {
   sent: { label: 'Enviado', variant: 'outline' },
   approved: { label: 'Confirmado', variant: 'default' },
   rejected: { label: 'Rechazado', variant: 'destructive' },
+  canceled: { label: 'Cancelado', variant: 'destructive' },
 };
 
 export default function BudgetsPageClient() {
   const { currentStudio, profile } = useAuth();
+  const router = useRouter();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const { toast } = useToast();
 
+  console.log('=== BudgetsPageClient DEBUG ===');
+  console.log('currentStudio:', currentStudio);
+  console.log('currentStudio type:', typeof currentStudio);
+  console.log('profile:', profile);
+
   const refreshData = async () => {
     if (!currentStudio) return;
     setLoading(true);
     try {
+      console.log('Fetching budgets for studio:', currentStudio.id);
       const fetchedBudgets = await getBudgets(currentStudio.id);
+      console.log('Budgets loaded successfully:', fetchedBudgets.length);
       setBudgets(fetchedBudgets);
     } catch (error) {
       console.error('Error fetching budgets:', error);
       toast({
         title: 'Error',
-        description: 'No se pudieron cargar los presupuestos.',
+        description: 'No se pudieron cargar los presupuestos. Verifica la conexión.',
         variant: 'destructive',
       });
     }
@@ -196,7 +206,9 @@ export default function BudgetsPageClient() {
             </TableHeader>
             <TableBody>
               {budgets.length > 0 ? (
-                budgets.map((budget) => (
+                budgets.map((budget) => {
+                  console.log('Rendering budget row for:', budget.id, budget.budgetName);
+                  return (
                   <TableRow key={budget.id}>
                     <TableCell className="font-medium">
                       {budget.budgetName}
@@ -231,13 +243,27 @@ export default function BudgetsPageClient() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuItem
-                            onClick={() => handleOpenDialog(budget)}
+                            onClick={() => {
+                              console.log('Navigating to budget summary:', budget.id);
+                              router.push(`/budgets/${budget.id}`)
+                            }}
                           >
-                            Ver / Editar
+                            Ver Resumen
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              console.log('Opening edit dialog for budget:', budget.id);
+                              handleOpenDialog(budget);
+                            }}
+                          >
+                            Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"
-                            onClick={() => handleDelete(budget.id!)}
+                            onClick={() => {
+                              console.log('Deleting budget:', budget.id);
+                              handleDelete(budget.id!);
+                            }}
                           >
                             Eliminar
                           </DropdownMenuItem>
@@ -245,7 +271,8 @@ export default function BudgetsPageClient() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center">

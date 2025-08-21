@@ -108,9 +108,12 @@ const SidebarMenuItem = forwardRef<HTMLLIElement, HTMLAttributes<HTMLLIElement>>
 ));
 SidebarMenuItem.displayName = "SidebarMenuItem";
 
-const SidebarMenuButton = forwardRef<HTMLAnchorElement, { href: string; label: string; icon: React.ElementType; isActive?: boolean; className?: string }>(
+const SidebarMenuButton = forwardRef<HTMLAnchorElement, { href?: string; label: string; icon?: React.ElementType; isActive?: boolean; className?: string }>(
     ({ href, label, icon: Icon, isActive, className }, ref) => {
         const { isCollapsed } = useSidebar();
+
+        // Don't render if no href provided
+        if (!href) return null;
 
         return (
             <Button
@@ -119,7 +122,7 @@ const SidebarMenuButton = forwardRef<HTMLAnchorElement, { href: string; label: s
                 className={cn('w-full flex justify-start items-center gap-3', { 'justify-center px-2': isCollapsed }, className)}
             >
                 <Link href={href} ref={ref}>
-                    <Icon className="h-5 w-5" />
+                    {Icon && <Icon className="h-5 w-5" />}
                     <span className={cn('truncate', { 'sr-only': isCollapsed, 'group-data-[collapsible=icon]:hidden': isCollapsed })}>
                         {label}
                     </span>

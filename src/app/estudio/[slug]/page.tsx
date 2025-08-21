@@ -9,32 +9,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Star, Clock, MapPin, Phone, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getAllStudios, getStaffForStudio, getServices, getBookings, Service, Booking } from "@/lib/firebase/firestore";
-import { Studio, UserProfile } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { getAllStudios, getStaffForStudio, getServicesForStudio } from "@/lib/firebase/firestore";
+import { Studio, UserProfile, Service } from "@/lib/types";
 
 export default function StudioProfilePage({ params: { slug } }: { params: { slug: string } }) {
+    const router = useRouter();
     const [studio, setStudio] = useState<Studio | null>(null);
     const [staff, setStaff] = useState<(UserProfile & { roleId: string })[]>([]);
     const [services, setServices] = useState<Service[]>([]);
-    const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const handleBookAppointment = (studioId: string, serviceId?: string) => {
+        router.push(`/customer/book/${studioId}${serviceId ? `?service=${serviceId}` : ''}`);
+    };
 
     useEffect(() => {
         const fetchStudioData = async () => {
+            console.log('DEBUG: Fetching studio data for slug:', slug);
             setLoading(true);
-            const studios = await getAllStudios();
-            const currentStudio = studios.find(s => s.id === slug); // Simple slug-matching for now
-            
-            if (currentStudio) {
-                setStudio(currentStudio);
-                const [staffData, servicesData, bookingsData] = await Promise.all([
-                    getStaffForStudio(currentStudio.id),
-                    getServices(currentStudio.id),
-                    getBookings(currentStudio.id)
-                ]);
-                setStaff(staffData);
-                setServices(servicesData);
-                setBookings(bookingsData);
+            try {
+                const studios = await getAllStudios();
+                console.log('DEBUG: All studios fetched:', studios.length);
+                const currentStudio = studios.find(s => s.id === slug); // Simple slug-matching for now
+                console.log('DEBUG: Found studio:', currentStudio);
+                
+                if (currentStudio) {
+                    setStudio(currentStudio);
+                    const [staffData, servicesData] = await Promise.all([
+                        getStaffForStudio(currentStudio.id),
+                        getServicesForStudio(currentStudio.id)
+                    ]);
+                    console.log('DEBUG: Staff data:', staffData);
+                    console.log('DEBUG: Services data:', servicesData);
+                    setStaff(staffData);
+                    setServices(servicesData);
+                } else {
+                    console.log('DEBUG: Studio not found for slug:', slug);
+                }
+            } catch (error) {
+                console.error('DEBUG: Error fetching studio data:', error);
             }
             setLoading(false);
         };
@@ -71,8 +85,12 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
                                     <span className="text-sm text-muted-foreground">(152 reseñas)</span>
                                 </div>
                             </div>
-                             <Button size="lg" className="w-full md:w-auto" asChild>
-                                <Link href="/appointments">Reservar Turno</Link>
+                             <Button 
+                                size="lg" 
+                                className="w-full md:w-auto"
+                                onClick={() => handleBookAppointment(studio?.id || '')}
+                            >
+                                Reservar Turno
                             </Button>
                         </div>
                     </Card>
@@ -100,8 +118,11 @@ export default function StudioProfilePage({ params: { slug } }: { params: { slug
                                     </CardHeader>
                                     <CardContent>
                                         <p className="text-sm text-muted-foreground">{service.categoryId || 'General'}</p>
-                                        <Button className="w-full mt-4" asChild>
-                                            <Link href="/appointments">Añadir a la Reserva</Link>
+                                        <Button 
+                                            className="w-full mt-4" 
+                                            onClick={() => handleBookAppointment(studio?.id || '', service.id)}
+                                        >
+                                            Agendar Cita
                                         </Button>
                                     </CardContent>
                                 </Card>

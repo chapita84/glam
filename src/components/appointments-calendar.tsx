@@ -16,7 +16,7 @@ import {
     getStaffForStudio,
     getAppointments,
     getStudioConfig,
-    getStudioClients
+    getAllCustomers
 } from "@/lib/firebase/firestore"
 import { type Appointment, type TimeBlock, type Service, type UserProfile } from "@/lib/types";
 import { StudioConfig } from "@/lib/firebase/firestore";
@@ -127,7 +127,7 @@ export function AppointmentsCalendar() {
         getStaffForStudio(currentStudio.id),
         getServicesForStudio(currentStudio.id),
         getStudioConfig(currentStudio.id),
-        getStudioClients(currentStudio.id)
+        getAllCustomers() // Obtener todos los customers de la aplicación
       ]);
       setStaff(staffList);
       setServices(serviceList);
@@ -206,7 +206,7 @@ export function AppointmentsCalendar() {
             getStaffForStudio(currentStudio.id),
             getServicesForStudio(currentStudio.id),
             getStudioConfig(currentStudio.id),
-            getStudioClients(currentStudio.id)
+            getAllCustomers() // Obtener todos los customers de la aplicación
         ]);
         setAppointments(appts);
         setTimeBlocks(blocks);

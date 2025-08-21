@@ -5,6 +5,7 @@ import {
   getDocs,
   doc,
   setDoc,
+  addDoc,
   deleteDoc,
   serverTimestamp,
   getDoc,
@@ -279,6 +280,31 @@ export async function getStudioClients(studioId: string): Promise<UserProfile[]>
     return clients;
   } catch (error) {
     console.error('Error fetching studio clients:', error);
+    return [];
+  }
+}
+
+// Get all customers from the application (users with globalRole: 'customer')
+export async function getAllCustomers(): Promise<UserProfile[]> {
+  try {
+    console.log('Fetching all customers from users collection...');
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('globalRole', '==', 'customer'));
+    const snapshot = await getDocs(q);
+    
+    const customers: UserProfile[] = snapshot.docs.map(doc => ({
+      uid: doc.id,
+      email: doc.data().email || '',
+      displayName: doc.data().displayName || doc.data().firstName + ' ' + doc.data().lastName || doc.data().email || '',
+      globalRole: 'customer',
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+      ...doc.data()
+    } as UserProfile));
+    
+    console.log('Found customers:', customers.map(c => ({ uid: c.uid, email: c.email, name: c.displayName })));
+    return customers;
+  } catch (error) {
+    console.error('Error fetching customers:', error);
     return [];
   }
 }
@@ -742,14 +768,46 @@ export async function deleteTimeBlock(studioId: string, blockId: string): Promis
 
 // --- Budgets ---
 export async function getBudgets(studioId: string): Promise<Budget[]> {
-    const colRef = collection(db, 'studios', studioId, 'budgets');
-    const snapshot = await getDocs(colRef);
-    return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Budget));
+    try {
+        console.log('Fetching budgets for studio:', studioId);
+        const colRef = collection(db, 'studios', studioId, 'budgets');
+        const snapshot = await getDocs(colRef);
+        console.log('Budgets fetched successfully, count:', snapshot.docs.length);
+        return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Budget));
+    } catch (error) {
+        console.error('Error fetching budgets:', error);
+        // Re-throw the error so the calling component can handle it
+        throw error;
+    }
 }
 
 export async function addOrUpdateBudget(studioId: string, budget: Omit<Budget, 'id'> & { id?: string }): Promise<void> {
-    const docRef = budget.id ? doc(db, 'studios', studioId, 'budgets', budget.id) : doc(collection(db, 'studios', studioId, 'budgets'));
-    await setDoc(docRef, { ...budget, id: docRef.id }, { merge: true });
+    console.log('=== addOrUpdateBudget DEBUG ===');
+    console.log('studioId:', studioId);
+    console.log('budget:', JSON.stringify(budget, null, 2));
+    
+    try {
+        // NO incluir el ID en los datos del documento
+        const { id, ...dataToSave } = budget;
+        console.log('Data to save (without id):', JSON.stringify(dataToSave, null, 2));
+        
+        if (budget.id) {
+            // Si hay ID, actualizar documento existente
+            const docRef = doc(db, 'studios', studioId, 'budgets', budget.id);
+            console.log('Updating existing document:', docRef.path);
+            await setDoc(docRef, dataToSave, { merge: true });
+            console.log('Budget updated successfully with ID:', budget.id);
+        } else {
+            // Si no hay ID, crear nuevo documento (como el test exitoso)
+            const budgetsCollection = collection(db, 'studios', studioId, 'budgets');
+            console.log('Creating new document in collection:', budgetsCollection.path);
+            const docRef = await addDoc(budgetsCollection, dataToSave);
+            console.log('Budget created successfully with new ID:', docRef.id);
+        }
+    } catch (error) {
+        console.error('Error in addOrUpdateBudget:', error);
+        throw error;
+    }
 }
 
 export async function deleteBudget(studioId: string, budgetId: string): Promise<void> {

@@ -311,9 +311,11 @@ export default function CustomerPage() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => router.push(`/customer/studio/${studio.id}`)}
+                      asChild
                     >
-                      Ver estudio completo
+                      <Link href={`/estudio/${studio.id}`}>
+                        Ver estudio completo
+                      </Link>
                     </Button>
                   </div>
                 </CardContent>
@@ -401,13 +403,11 @@ export default function CustomerPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => setShowSearch(true)}>
             <Search className="h-6 w-6" />
-            <span className="text-sm">Buscar</span>
+            <span className="text-sm">Explorar estudios</span>
           </Button>
-          <Button variant="outline" className="h-20 flex flex-col gap-2" asChild>
-            <Link href="/customer/book">
-              <Plus className="h-6 w-6" />
-              <span className="text-sm">Nueva Cita</span>
-            </Link>
+          <Button variant="outline" className="h-20 flex flex-col gap-2" onClick={() => setShowSearch(true)}>
+            <Plus className="h-6 w-6" />
+            <span className="text-sm">Nueva Cita</span>
           </Button>
           <Button variant="outline" className="h-20 flex flex-col gap-2" asChild>
             <Link href="/customer/appointments">

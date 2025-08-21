@@ -133,6 +133,16 @@ export const BudgetItemSchema = z.object({
 });
 export type BudgetItem = z.infer<typeof BudgetItemSchema>;
 
+export const BudgetStatusHistorySchema = z.object({
+  status: z.enum(['draft', 'sent', 'approved', 'rejected', 'canceled']),
+  timestamp: z.any(), // Date or Firestore timestamp
+  userId: z.string(),
+  userEmail: z.string(),
+  userName: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type BudgetStatusHistory = z.infer<typeof BudgetStatusHistorySchema>;
+
 export const BudgetSchema = z.object({
   id: z.string().optional(),
   budgetName: z.string().min(3, "El nombre del presupuesto es obligatorio."),
@@ -151,7 +161,8 @@ export const BudgetSchema = z.object({
       exchangeRate: z.number(),
       totalARS: z.number(),
   }),
-  status: z.enum(['draft', 'sent', 'approved', 'rejected']).default('draft'),
+  status: z.enum(['draft', 'sent', 'approved', 'rejected', 'canceled']).default('draft'),
+  statusHistory: z.array(BudgetStatusHistorySchema).default([]),
   createdAt: z.any().optional(),
   updatedAt: z.any().optional(),
 });

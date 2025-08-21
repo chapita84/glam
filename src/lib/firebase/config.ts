@@ -1,7 +1,7 @@
 // src/lib/firebase/config.ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // New, direct configuration for glamdash-v2
 const firebaseConfig = {
@@ -18,5 +18,16 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+// Add error handling for Firestore connection issues
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    console.log('🟢 Network connection restored');
+  });
+  
+  window.addEventListener('offline', () => {
+    console.log('🔴 Network connection lost');
+  });
+}
 
 export { db, auth, app };

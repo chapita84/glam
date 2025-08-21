@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "glamdash-v2"
-  }
+    "default": "glamdash-v2",
+    "glam": "glamdash-v2"
+  },
+  "targets": {},
+  "etags": {}
 }
